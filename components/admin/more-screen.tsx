@@ -12,6 +12,7 @@ import type { SiteContent } from "@/lib/types";
 const LINKS = [
   ["/admin/innehall", "Redigera startsidan", "Bilder, texter och kampanj"],
   ["/admin/butiker", "Butiker och öppettider", "Adress, veckoschema och helgdagar"],
+  ["/admin/erbjudanden", "Erbjudanden", "Rabatt för nya kunder, trogna kunder och inloggade"],
   ["/admin/logg", "Lagerlogg", "Vad som sålts, fyllts på och synkats"],
   ["/admin/installningar", "Inställningar", "Telefon, frakt och meddelande till kunden"],
 ];

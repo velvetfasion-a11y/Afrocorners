@@ -20,8 +20,9 @@ export function fulfilmentBlock(input: OrderMessageInput): string {
     const name = storeName(stores, order.pickupStoreId);
     return [`Leveranssätt: Avhämtning i butik${name ? ` (${name})` : ""}`, "Frakt: Ingen, hämtas i butik"].join("\n");
   }
+  const merchandise = order.subtotal ?? order.total;
   const shipping =
-    order.total >= freeShippingThreshold
+    merchandise >= freeShippingThreshold
       ? `Frakt: Fri frakt (över ${freeShippingThreshold} kr)`
       : `Frakt: Frakt tillkommer (under ${freeShippingThreshold} kr)`;
   return ["Leveranssätt: Hemleverans", shipping].join("\n");
@@ -67,6 +68,11 @@ export function buildOrderMessage(input: OrderMessageInput): string {
   if (!input.template.includes("{{fulfilment}}")) text += `\n${fulfilment}`;
   if (!input.template.includes("{{customer}}")) text += `\n${customer}`;
   if (!input.template.includes("{{number}}")) text += `\nOrdernummer: ${number}`;
+  if (input.order.discount && input.order.discount.amount > 0) {
+    const lines = [`Erbjudande: ${input.order.discount.title}`, `Rabatt: ${sek(input.order.discount.amount)}`];
+    if (input.order.subtotal != null) lines.push(`Ordervärde före rabatt: ${sek(input.order.subtotal)}`);
+    text += `\n\n${lines.join("\n")}`;
+  }
   return text.trim();
 }
 

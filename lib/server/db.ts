@@ -4,6 +4,7 @@ import { mkdir, readFile, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import path from "path";
 import { unitPrice } from "../format";
+import { normalizeOffers, pickOffer, stockholmDate, type CustomerProfile, type ShopOffer } from "../offers";
 import { applyOrderStock, commitMovement, reverseOrderStock, type CommitResult } from "../inventory";
 import { createSeed } from "../seed";
 import type { Database, Order, Product, SiteContent, StockLogEntry, StockMovementInput, StoreId, SumupState } from "../types";
@@ -29,6 +30,8 @@ async function readFileDb(): Promise<Database> {
     parsed.orders ??= [];
     parsed.logs ??= [];
     parsed.sumup ??= createSeed().sumup;
+    parsed.offers = normalizeOffers(parsed.offers);
+    parsed.customers ??= [];
     return parsed;
   } catch {
     const seed = createSeed();
@@ -231,6 +234,9 @@ export async function createPricedOrder(input: {
   pickupStoreId: StoreId | null;
   customer: Order["customer"];
   number: string;
+  customerUid?: string | null;
+  account?: CustomerProfile | null;
+  offers?: ShopOffer[];
 }): Promise<Order> {
   const db = await readDatabase();
   const items: Order["items"] = [];
@@ -248,6 +254,9 @@ export async function createPricedOrder(input: {
     });
   }
   if (items.length === 0) throw new Error("Varukorgen är tom.");
+  const subtotal = items.reduce((sum, item) => sum + item.unitPrice * item.qty, 0);
+  const applied = input.account ? pickOffer(input.offers ?? [], input.account, subtotal, stockholmDate()) : null;
+  const discount = Math.min(subtotal, Math.max(0, applied?.discount ?? 0));
   const order: Order = {
     id: crypto.randomUUID(),
     number: input.number,
@@ -258,7 +267,12 @@ export async function createPricedOrder(input: {
     shipFromStoreId: null,
     customer: input.customer,
     items,
-    total: items.reduce((sum, item) => sum + item.unitPrice * item.qty, 0),
+    subtotal,
+    total: subtotal - discount,
+    customerUid: input.customerUid ?? null,
+    discount: applied && discount > 0
+      ? { offerId: applied.offerId, title: applied.title, amount: discount }
+      : null,
     stockApplied: false,
     stockGeneration: 0,
     stockDeductions: [],
@@ -266,6 +280,104 @@ export async function createPricedOrder(input: {
   };
   await saveOrder(order);
   return order;
+}
+
+export async function readOffers(): Promise<ShopOffer[]> {
+  if (dataMode() === "file") {
+    const db = await readFileDb();
+    return normalizeOffers(db.offers);
+  }
+  const db = await firestore();
+  const snap = await db.collection("offers").get();
+  const stored = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as ShopOffer);
+  return normalizeOffers(stored);
+}
+
+export async function writeOffers(offers: ShopOffer[]): Promise<ShopOffer[]> {
+  const next = normalizeOffers(offers);
+  if (dataMode() === "file") {
+    await queue(async () => {
+      const db = await readFileDb();
+      db.offers = next;
+      await writeFileDb(db);
+    });
+    return next;
+  }
+  const db = await firestore();
+  const batch = db.batch();
+  for (const offer of next) batch.set(db.collection("offers").doc(offer.id), offer);
+  await batch.commit();
+  return next;
+}
+
+export async function readCustomer(uid: string): Promise<CustomerProfile | null> {
+  if (dataMode() === "file") {
+    const db = await readFileDb();
+    return db.customers?.find((item) => item.uid === uid) ?? null;
+  }
+  const db = await firestore();
+  const snap = await db.collection("customers").doc(uid).get();
+  return snap.exists ? (snap.data() as CustomerProfile) : null;
+}
+
+export async function writeCustomer(profile: CustomerProfile): Promise<void> {
+  if (dataMode() === "file") {
+    await queue(async () => {
+      const db = await readFileDb();
+      const customers = db.customers ?? [];
+      const index = customers.findIndex((item) => item.uid === profile.uid);
+      if (index >= 0) customers[index] = profile;
+      else customers.push(profile);
+      db.customers = customers;
+      await writeFileDb(db);
+    });
+    return;
+  }
+  const db = await firestore();
+  await db.collection("customers").doc(profile.uid).set(profile, { merge: true });
+}
+
+export async function ordersForCustomer(uid: string): Promise<Order[]> {
+  if (dataMode() === "file") {
+    const db = await readFileDb();
+    return db.orders.filter((order) => order.customerUid === uid);
+  }
+  const db = await firestore();
+  const snap = await db.collection("orders").where("customerUid", "==", uid).get();
+  return snap.docs
+    .map((doc) => doc.data() as Order)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+/** Counts the order after eligibility was decided, so the first order still qualifies. */
+export async function recordCustomerOrder(uid: string, when = new Date().toISOString()): Promise<void> {
+  if (dataMode() === "file") {
+    await queue(async () => {
+      const db = await readFileDb();
+      const customers = db.customers ?? [];
+      const index = customers.findIndex((item) => item.uid === uid);
+      if (index < 0) return;
+      const current = customers[index];
+      customers[index] = {
+        ...current,
+        orderCount: (current.orderCount ?? 0) + 1,
+        firstOrderAt: current.firstOrderAt ?? when,
+      };
+      db.customers = customers;
+      await writeFileDb(db);
+    });
+    return;
+  }
+  const db = await firestore();
+  const ref = db.collection("customers").doc(uid);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const current = snap.data() as CustomerProfile | undefined;
+    tx.set(ref, {
+      orderCount: (current?.orderCount ?? 0) + 1,
+      firstOrderAt: current?.firstOrderAt ?? when,
+    }, { merge: true });
+  });
 }
 
 export async function transitionOrder(orderId: string, status: Order["status"], shipFrom: StoreId): Promise<Order> {

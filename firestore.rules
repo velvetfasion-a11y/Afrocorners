@@ -29,13 +29,82 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    function isValidCustomer(data) {
+      return data.uid is string
+        && data.uid == request.auth.uid
+        && data.uid.size() > 0
+        && data.uid.size() <= 128
+        && data.email is string
+        && data.email.size() > 3
+        && data.email.size() <= 120
+        && data.email.lower() == request.auth.token.email.lower()
+        && data.name is string
+        && data.name.size() > 0
+        && data.name.size() <= 80
+        && data.favorites is list
+        && data.favorites.size() <= 100;
+    }
+
+    function customerStatsLocked() {
+      return request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.firstOrderAt == resource.data.firstOrderAt
+        && request.resource.data.orderCount == resource.data.orderCount
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.email == resource.data.email;
+    }
+
+    function isValidOffer(data) {
+      return data.kind in ["new_customer", "loyal", "everyone"]
+        && data.id == data.kind
+        && data.title is string
+        && data.title.size() > 0
+        && data.title.size() <= 80
+        && data.enabled is bool
+        && data.unit in ["percent", "kr"]
+        && data.amount is number
+        && data.amount >= 1
+        && data.amount <= 5000
+        && data.minOrder is number
+        && data.minOrder >= 0
+        && data.minOrder <= 100000
+        && data.minAccountDays is number
+        && data.minAccountDays >= 0
+        && data.minAccountDays <= 3650
+        && data.startsOn is string
+        && data.startsOn.size() <= 10
+        && data.endsOn is string
+        && data.endsOn.size() <= 10;
+    }
+
     match /orders/{id} {
       allow create: if request.resource.data.status == "ny"
         && request.resource.data.stockApplied == false
         && request.resource.data.items is list
         && request.resource.data.items.size() > 0
-        && request.resource.data.items.size() <= 40;
+        && request.resource.data.items.size() <= 40
+        && request.resource.data.discount == null
+        && request.resource.data.customerUid == null;
       allow read, update, delete: if isAdmin();
+    }
+
+    match /customers/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && isValidCustomer(request.resource.data)
+        && !request.resource.data.keys().hasAny(["createdAt", "firstOrderAt", "orderCount", "role"]);
+      allow update: if signedIn()
+        && request.auth.uid == uid
+        && isValidCustomer(request.resource.data)
+        && customerStatsLocked()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["favorites", "name"]);
+      allow delete: if false;
+    }
+
+    match /offers/{id} {
+      allow read: if signedIn();
+      allow create, update: if isAdmin() && isValidOffer(request.resource.data);
+      allow delete: if isAdmin();
     }
 
     match /stockLogs/{id} {

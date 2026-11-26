@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { badgeFor, normalizeName, sek, toE164, unitPrice } from "@/lib/format";
+import { offerSummary } from "@/lib/offers";
 import { buildOrderMessage, smsUrl, whatsappUrl } from "@/lib/orders";
 import type { Order, Product, StoreId } from "@/lib/types";
 import { ProductGrid } from "./product-card";
@@ -131,10 +132,12 @@ export function ProductPage({ slug }: { slug: string }) {
 }
 
 export function CartPage() {
-  const { products, cart, setQty, content } = useShop();
+  const { products, cart, setQty, content, quote, account } = useShop();
   const lines = Object.entries(cart).map(([id, qty]) => ({ product: products.find((item) => item.id === id), qty })).filter((line) => line.product);
-  const total = lines.reduce((sum, line) => sum + unitPrice(line.product as Product) * line.qty, 0);
-  const left = content.freeShippingThreshold - total;
+  const subtotal = lines.reduce((sum, line) => sum + unitPrice(line.product as Product) * line.qty, 0);
+  const deal = quote(subtotal);
+  const total = subtotal - (deal?.discount ?? 0);
+  const left = content.freeShippingThreshold - subtotal;
   return (
     <div className="wrap py-8">
       <h1 className="font-display text-4xl">Varukorg</h1>
@@ -164,6 +167,10 @@ export function CartPage() {
           </ul>
           <aside className="h-fit rounded-3xl bg-paper p-5">
             <p className="text-sm text-muted">Att betala hos butiken</p>
+            {deal && (
+              <p className="mt-2 text-sm text-brown">{deal.title}: −{sek(deal.discount)}</p>
+            )}
+            {!account && <p className="mt-2 text-sm text-muted"><Link href="/konto" className="underline">Logga in</Link> för att se dina rabatter.</p>}
             <p className="font-display text-4xl">{sek(total)}</p>
             <p className="mt-2 text-sm">{left > 0 ? `${sek(left)} kvar till fri frakt.` : `Fri frakt över ${content.freeShippingThreshold} kr.`}</p>
             <Link href="/kassa" className="gold-btn mt-5 flex h-12 items-center justify-center rounded-full">Till beställning</Link>
@@ -175,7 +182,7 @@ export function CartPage() {
 }
 
 export function CheckoutPage() {
-  const { products, cart, content, clearCart } = useShop();
+  const { products, cart, content, clearCart, quote, account, refreshAccount } = useShop();
   const router = useRouter();
   const lines = Object.entries(cart).map(([id, qty]) => ({ product: products.find((item) => item.id === id), qty })).filter((line): line is { product: Product; qty: number } => Boolean(line.product));
   const [fulfilment, setFulfilment] = useState<"delivery" | "pickup">("delivery");
@@ -185,7 +192,13 @@ export function CheckoutPage() {
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [order, setOrder] = useState<Order | null>(null);
-  const total = lines.reduce((sum, line) => sum + unitPrice(line.product) * line.qty, 0);
+  const subtotal = lines.reduce((sum, line) => sum + unitPrice(line.product) * line.qty, 0);
+  const deal = quote(subtotal);
+  const total = subtotal - (deal?.discount ?? 0);
+  useEffect(() => {
+    if (!account?.customer.name) return;
+    setCustomer((current) => current.name ? current : { ...current, name: account.customer.name });
+  }, [account]);
 
   const message = useMemo(() => {
     if (!order) return "";
@@ -200,9 +213,11 @@ export function CheckoutPage() {
 
   async function ensureOrder() {
     if (order) return order;
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (account) headers.Authorization = `Bearer ${await account.getIdToken()}`;
     const response = await fetch("/api/orders", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({
         items: lines.map((line) => ({ productId: line.product.id, qty: line.qty })),
         fulfilment,
@@ -217,6 +232,7 @@ export function CheckoutPage() {
     localStorage.setItem("afrocorner-my-orders", JSON.stringify([saved, ...mine].slice(0, 20)));
     setOrder(saved);
     clearCart();
+    await refreshAccount();
     return saved;
   }
 
@@ -309,6 +325,7 @@ export function CheckoutPage() {
                 ))}
               </div>
             )}
+            {deal && <p className="text-sm text-brown">{deal.title}: −{sek(deal.discount)}</p>}
             <p className="text-sm text-muted">Totalt {sek(total)}. Betalning sker via länken butiken skickar.</p>
           </div>
           <ul className="space-y-2 text-sm">
@@ -370,28 +387,88 @@ export function StoresPage() {
 }
 
 export function AccountPage() {
-  const { content } = useShop();
-  const [orders, setOrders] = useState<Order[]>([]);
+  const { content, products, favorites, account, accountReady, googleConfigured, signInAccount, signOutAccount } = useShop();
+  const [localOrders, setLocalOrders] = useState<Order[]>([]);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
   useEffect(() => {
     try {
-      setOrders(JSON.parse(localStorage.getItem("afrocorner-my-orders") || "[]") as Order[]);
+      setLocalOrders(JSON.parse(localStorage.getItem("afrocorner-my-orders") || "[]") as Order[]);
     } catch {
-      setOrders([]);
+      setLocalOrders([]);
     }
-  }, []);
+  }, [account?.customer.uid]);
+  const saved = account
+    ? [...account.orders, ...localOrders.filter((order) => !account.orders.some((item) => item.id === order.id))]
+    : localOrders;
+  const loved = products.filter((product) => favorites.includes(product.id));
+
+  async function signIn() {
+    setBusy(true);
+    setError("");
+    try {
+      await signInAccount();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Kunde inte logga in.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="wrap py-8">
       <h1 className="font-display text-4xl">Konto</h1>
-      <p className="mt-2 text-muted">Beställningar från den här telefonen. Butiken svarar på WhatsApp eller SMS.</p>
-      <ul className="mt-6 space-y-3">
-        {orders.length === 0 && <li className="text-muted">Inga sparade beställningar ännu.</li>}
-        {orders.map((order) => (
-          <li key={order.id} className="rounded-3xl bg-paper p-4">
-            <p className="font-medium">{order.number}</p>
-            <p className="text-sm text-muted">{sek(order.total)} · {order.fulfilment === "pickup" ? "Hämta i butik" : "Hemleverans"}</p>
-          </li>
-        ))}
-      </ul>
+      {!accountReady && <p className="mt-2 text-muted">Hämtar kontot…</p>}
+      {accountReady && !account && (
+        <div className="mt-6 max-w-md rounded-3xl bg-paper p-5">
+          <p className="text-muted">Logga in med Google för att spara favoriter och se rabatter. Det här är inte butikens admin.</p>
+          {googleConfigured ? (
+            <button type="button" disabled={busy} className="gold-btn mt-4 h-12 w-full rounded-full disabled:opacity-60" onClick={signIn}>Logga in med Google</button>
+          ) : (
+            <p className="mt-4 text-sm text-muted">Google-inloggning är inte påslagen i den här förhandsvisningen.</p>
+          )}
+          {error && <p className="mt-3 text-sm text-red-800">{error}</p>}
+        </div>
+      )}
+      {account && (
+        <div className="mt-6 max-w-md rounded-3xl bg-paper p-5">
+          <p className="font-display text-3xl">{account.customer.name}</p>
+          <p className="text-sm text-muted">{account.customer.email}</p>
+          <button type="button" className="mt-4 text-sm underline" onClick={() => signOutAccount()}>Logga ut</button>
+        </div>
+      )}
+      {account && (
+        <section className="mt-8">
+          <h2 className="font-display text-2xl">Dina erbjudanden</h2>
+          {account.offers.length === 0 && <p className="mt-2 text-muted">Inga aktiva rabatter just nu.</p>}
+          <ul className="mt-3 space-y-2">
+            {account.offers.map((offer) => (
+              <li key={offer.id} className="rounded-2xl border border-[#e4d3b4] bg-[#fbf6ee] px-4 py-3 text-sm">{offerSummary(offer)}</li>
+            ))}
+          </ul>
+        </section>
+      )}
+      <section className="mt-8">
+        <h2 className="font-display text-2xl">Favoriter</h2>
+        {loved.length === 0 && <p className="mt-2 text-muted">Inga sparade favoriter ännu.</p>}
+        <ul className="mt-3 space-y-2">
+          {loved.map((product) => (
+            <li key={product.id}><Link href={`/produkt/${product.slug}`} className="underline">{product.name}</Link></li>
+          ))}
+        </ul>
+      </section>
+      <section className="mt-8">
+        <h2 className="font-display text-2xl">Beställningar</h2>
+        <ul className="mt-3 space-y-3">
+          {saved.length === 0 && <li className="text-muted">Inga sparade beställningar ännu.</li>}
+          {saved.map((order) => (
+            <li key={order.id} className="rounded-3xl bg-paper p-4">
+              <p className="font-medium">{order.number}</p>
+              <p className="text-sm text-muted">{sek(order.total)} · {order.fulfilment === "pickup" ? "Hämta i butik" : "Hemleverans"}{order.discount ? ` · ${order.discount.title}` : ""}</p>
+            </li>
+          ))}
+        </ul>
+      </section>
       <p className="mt-8 text-sm">Kundtjänst {content.ownerPhone}</p>
     </div>
   );

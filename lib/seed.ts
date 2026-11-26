@@ -1,3 +1,4 @@
+import { defaultOffers } from "./offers";
 import { DEFAULT_SUMUP_CHANNELS, type Database, type DayHours, type Product, type SiteContent, type StoreLocation } from "./types";
 
 const weekday = (open: string, close: string): DayHours => ({ open, close });
@@ -398,5 +399,7 @@ export function createSeed(now = new Date()): Database {
     logs: [],
     content: seedContent,
     sumup: emptySumup(now),
+    offers: defaultOffers(),
+    customers: [],
   };
 }

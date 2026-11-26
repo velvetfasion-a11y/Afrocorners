@@ -5,7 +5,9 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { AfricaMark } from "@/components/AfricaMark";
+import { offerSummary, pickOffer, stockholmDate } from "@/lib/offers";
 import type { IconName, Product, SiteContent } from "@/lib/types";
+import { useCustomerSession, type ShopAccount } from "./customer-auth";
 import { StoreCard, useNow } from "./store-bits";
 
 type Cart = Record<string, number>;
@@ -21,6 +23,13 @@ interface ShopValue {
   clearCart: () => void;
   refresh: () => Promise<void>;
   count: number;
+  account: ShopAccount | null;
+  accountReady: boolean;
+  googleConfigured: boolean;
+  signInAccount: () => Promise<void>;
+  signOutAccount: () => Promise<void>;
+  refreshAccount: () => Promise<void>;
+  quote: (subtotal: number) => ReturnType<typeof pickOffer>;
 }
 
 const ShopContext = createContext<ShopValue | null>(null);
@@ -241,6 +250,8 @@ export function ShopShell({
   const [query, setQuery] = useState("");
   const pathname = usePathname();
   const router = useRouter();
+  const session = useCustomerSession(setFavorites);
+  const { rememberFavorites, account, ready, configured, signIn, signOutAccount, refreshAccount } = session;
 
   useEffect(() => {
     setProducts(initialProducts);
@@ -261,7 +272,8 @@ export function ShopShell({
   }, [cart]);
   useEffect(() => {
     localStorage.setItem("afrocorner-favorites", JSON.stringify(favorites));
-  }, [favorites]);
+    rememberFavorites(favorites);
+  }, [favorites, rememberFavorites]);
   useEffect(() => { setMenu(false); setSearchOpen(false); }, [pathname]);
 
   useLayoutEffect(() => {
@@ -275,6 +287,7 @@ export function ShopShell({
   }, [content.infoBar.length]);
 
   const count = useMemo(() => Object.values(cart).reduce((sum, qty) => sum + qty, 0), [cart]);
+  const banner = account?.offers.map((offer) => offerSummary(offer)).join(" · ") ?? "";
 
   const value: ShopValue = {
     products,
@@ -282,6 +295,16 @@ export function ShopShell({
     cart,
     favorites,
     count,
+    account,
+    accountReady: ready,
+    googleConfigured: configured,
+    signInAccount: signIn,
+    signOutAccount,
+    refreshAccount,
+    quote(subtotal: number) {
+      if (!account) return null;
+      return pickOffer(account.offers, account.customer, subtotal, stockholmDate());
+    },
     add(id, qty = 1) {
       setCart((current) => ({ ...current, [id]: Math.min(99, (current[id] ?? 0) + qty) }));
     },
@@ -311,6 +334,11 @@ export function ShopShell({
         <Header onMenu={() => setMenu(true)} onSearch={() => setSearchOpen(true)} />
       </div>
       <div aria-hidden style={{ height: "var(--header-h)" }} />
+      {banner && (
+        <Link href="/konto" className="block bg-[#f6e7c3] py-2 text-center text-sm font-medium text-bark">
+          {banner}
+        </Link>
+      )}
       <NavDrawer open={menu} onClose={() => setMenu(false)} />
       {searchOpen && (
         <div className="fixed inset-x-0 z-40 bg-paper shadow-md" style={{ top: "var(--header-h)" }}>

@@ -65,10 +65,12 @@ Klistra in raden som skrivs ut i värdens `ADMIN_ACCESS_CODE_HASH`. Saknas hashe
 1. Skapa ett Firebase-projekt. Slå på **Authentication → Google**. E-post/lösenord ska vara av.
 2. Lägg webbnyckeln i `NEXT_PUBLIC_FIREBASE_*`.
 3. Lägg service account i `FIREBASE_SERVICE_ACCOUNT` eller `FIREBASE_SERVICE_ACCOUNT_PATH`.
-4. Publicera `firestore.rules` och `storage.rules`. De kräver Google, `email_verified`, och att `admins/{uid}` har samma e-post och rollen `owner` eller `developer`.
+4. Publicera `firestore.rules` och `storage.rules`. De kräver Google, `email_verified`, och att `admins/{uid}` har samma e-post och rollen `owner` eller `developer`. Kundkonton och erbjudanden ligger i samma regler och måste publiceras igen när de ändras: `firebase deploy --only firestore:rules --project afrocorner-store`.
 5. Sätt `ADMIN_EMAILS` och `ADMIN_ACCESS_CODE_HASH`.
 
-Kunder kan läsa katalogen och skapa ordrar med status `ny`. Allt annat kräver den korta sessionen.
+Kunder kan läsa katalogen. En inloggad kund kan bara läsa och skriva sitt eget `customers/{uid}` (favoriter, namn). `createdAt`, `orderCount` och `firstOrderAt` sätts av servern. Erbjudanden kan läsas av inloggade och skrivas av admin. Ett kundkonto ger aldrig admin: admin kräver fortfarande `ADMIN_EMAILS` och åtkomstkod.
+
+På `/konto` loggar kunden in med Google, samma `NEXT_PUBLIC_FIREBASE_*` som admin. Inga nya miljövariabler behövs. Rabatter ställs under **Admin → Erbjudanden**.
 
 ## Beställning
 

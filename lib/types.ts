@@ -73,7 +73,13 @@ export interface Order {
   shipFromStoreId: StoreId | null;
   customer: OrderCustomer;
   items: OrderItem[];
+  /** Amount due after any account discount. */
   total: number;
+  /** Merchandise total before discount. Absent on older orders. */
+  subtotal?: number;
+  /** Google account that placed the order. Never grants admin access. */
+  customerUid?: string | null;
+  discount?: { offerId: string; title: string; amount: number } | null;
   stockApplied: boolean;
   stockGeneration: number;
   stockDeductions: StockDeduction[];
@@ -232,6 +238,8 @@ export interface Database {
   logs: StockLogEntry[];
   content: SiteContent;
   sumup: SumupState;
+  offers?: import("./offers").ShopOffer[];
+  customers?: import("./offers").CustomerProfile[];
 }
 
 export const STORE_IDS: StoreId[] = ["fittja", "marsta"];

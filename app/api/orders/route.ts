@@ -1,5 +1,6 @@
 import { makeOrderNumber } from "@/lib/format";
-import { createPricedOrder, readDatabase } from "@/lib/server/db";
+import { customerFromRequest, InvalidCustomerToken } from "@/lib/server/customers";
+import { createPricedOrder, readDatabase, readOffers, recordCustomerOrder } from "@/lib/server/db";
 import { isUser, json, requireAdmin } from "@/lib/server/guard";
 import type { Fulfilment, StoreId } from "@/lib/types";
 
@@ -36,6 +37,7 @@ export async function POST(req: Request) {
     return json({ error: "Välj butik att hämta i." }, 400);
   }
   try {
+    const account = await customerFromRequest(req);
     const order = await createPricedOrder({
       items: body.items,
       fulfilment: body.fulfilment,
@@ -48,9 +50,14 @@ export async function POST(req: Request) {
         city: body.customer?.city?.trim() ?? "",
       },
       number: makeOrderNumber(),
+      customerUid: account?.uid ?? null,
+      account,
+      offers: account ? await readOffers() : [],
     });
+    if (account) await recordCustomerOrder(account.uid, order.createdAt);
     return json({ order });
   } catch (error) {
+    if (error instanceof InvalidCustomerToken) return json({ error: error.message }, 401);
     return json({ error: error instanceof Error ? error.message : "Kunde inte spara ordern." }, 400);
   }
 }

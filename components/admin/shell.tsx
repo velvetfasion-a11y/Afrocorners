@@ -19,7 +19,7 @@ const TABS = [
   { href: "/admin/ordrar", label: "Beställningar", icon: ShoppingBag, match: (path: string) => path.startsWith("/admin/ordrar") },
   { href: "/admin/produkter", label: "Produkter", icon: Package, match: (path: string) => path.startsWith("/admin/produkter") },
   { href: "/admin/lager", label: "Lager", icon: Warehouse, match: (path: string) => ["/admin/lager", "/admin/salt", "/admin/logg"].some((item) => path.startsWith(item)) },
-  { href: "/admin/mer", label: "Mer", icon: Menu, match: (path: string) => ["/admin/mer", "/admin/innehall", "/admin/butiker", "/admin/installningar"].some((item) => path.startsWith(item)) },
+  { href: "/admin/mer", label: "Mer", icon: Menu, match: (path: string) => ["/admin/mer", "/admin/innehall", "/admin/butiker", "/admin/installningar", "/admin/erbjudanden"].some((item) => path.startsWith(item)) },
 ];
 
 const SIDE = [
@@ -29,6 +29,7 @@ const SIDE = [
   ["/admin/lager", "Lager"],
   ["/admin/innehall", "Startsidan"],
   ["/admin/butiker", "Butiker"],
+  ["/admin/erbjudanden", "Erbjudanden"],
   ["/admin/logg", "Lagerlogg"],
   ["/admin/installningar", "Inställningar"],
 ];
