@@ -166,7 +166,12 @@ async function syncMerchant(
     refunds,
     barePayments: bare,
     applied,
-    products: database.products.filter((product) => product.active).map((product) => ({ id: product.id, name: product.name, sku: product.sku })),
+    products: database.products.filter((product) => product.active).map((product) => ({
+      id: product.id,
+      name: product.name,
+      sku: product.sku,
+      variants: product.variants?.map((variant) => ({ id: variant.id, label: variant.label, sumupSku: variant.sumupSku })),
+    })),
     mappings: sumup.productMappings,
     locations: [
       ...(connection.storeId

@@ -43,7 +43,11 @@ export async function commitMovement(
   if (!product) {
     throw new Error("Produkten finns inte längre.");
   }
-  const current = product.stock[input.storeId] ?? 0;
+  const variant = input.variantId ? product.variants?.find((item) => item.id === input.variantId) : undefined;
+  if (input.variantId && !variant) {
+    throw new Error("Storleken finns inte längre.");
+  }
+  const current = (variant ? variant.stock[input.storeId] : product.stock[input.storeId]) ?? 0;
   const { next, applied } = nextStockLevel(current, input.delta);
   const note =
     applied !== input.delta
@@ -56,7 +60,8 @@ export async function commitMovement(
     createdAt: now.toISOString(),
     storeId: input.storeId,
     productId: product.id,
-    productName: product.name,
+    variantId: variant?.id,
+    productName: variant ? `${product.name} – ${variant.label}` : product.name,
     change: applied,
     reason: input.reason,
     source: input.source,
@@ -67,9 +72,18 @@ export async function commitMovement(
   if (applied === 0 && !input.externalRef) {
     return { applied: false, skippedDuplicate: false, appliedChange: 0, entry: null };
   }
+  const variants = variant && product.variants
+    ? product.variants.map((item) => item.id === variant.id ? { ...item, stock: { ...item.stock, [input.storeId]: next } } : item)
+    : product.variants;
   const saved: Product = {
     ...product,
-    stock: { ...product.stock, [input.storeId]: next },
+    variants,
+    stock: variants?.length
+      ? {
+          fittja: variants.reduce((sum, item) => sum + (item.stock.fittja ?? 0), 0),
+          marsta: variants.reduce((sum, item) => sum + (item.stock.marsta ?? 0), 0),
+        }
+      : { ...product.stock, [input.storeId]: next },
   };
   await port.saveProduct(saved);
   await port.addLog(entry);
@@ -91,11 +105,12 @@ export async function applyOrderStock(commit: CommitFn, order: Order, shipFrom: 
       reason: "online_order",
       source: "order",
       orderId: order.id,
-      externalRef: `order:${order.id}:${generation}:${item.productId}:${storeId}`,
+      variantId: item.variantId,
+      externalRef: `order:${order.id}:${generation}:${item.productId}:${item.variantId ?? ""}:${storeId}`,
       note: `Order ${order.number}`,
     });
     if (result.appliedChange < 0) {
-      deductions.push({ productId: item.productId, storeId, qty: -result.appliedChange });
+      deductions.push({ productId: item.productId, variantId: item.variantId, storeId, qty: -result.appliedChange });
     }
   }
   return {
@@ -116,11 +131,12 @@ export async function reverseOrderStock(commit: CommitFn, order: Order, nextStat
     await commit({
       storeId: deduction.storeId,
       productId: deduction.productId,
+      variantId: deduction.variantId,
       delta: deduction.qty,
       reason: "manual",
       source: "order",
       orderId: order.id,
-      externalRef: `order-reversal:${order.id}:${generation}:${deduction.productId}:${deduction.storeId}`,
+      externalRef: `order-reversal:${order.id}:${generation}:${deduction.productId}:${deduction.variantId ?? ""}:${deduction.storeId}`,
       note: `Lager återfört från order ${order.number}`,
     });
   }

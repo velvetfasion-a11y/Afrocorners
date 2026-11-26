@@ -10,7 +10,8 @@ import { api } from "@/components/admin/api";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input, Label, Textarea } from "@/components/ui/input";
 import { sek, unitPrice } from "@/lib/format";
-import { CATEGORY_LABEL, LOW_STOCK_AT, type CategoryId, type Product } from "@/lib/types";
+import { CATEGORY_LABEL, LOW_STOCK_AT, type CategoryId, type Product, type ProductVariant } from "@/lib/types";
+import { hasVariants, priceSpan } from "@/lib/variants";
 
 function readParam(name: string) {
   if (typeof window === "undefined") return "";
@@ -89,8 +90,8 @@ export function ProductList() {
             <Link href={`/admin/produkter/${product.id}`} className="block">
               <img src={product.images[0] || "/images/cat-skonhet.jpg"} alt="" className="aspect-square w-full rounded-2xl object-cover" />
               <span className="mt-2 block font-medium leading-tight">{product.name}</span>
-              <span className="mt-1 block text-sm text-muted">{sek(unitPrice(product))}</span>
-              <span className="mt-1 block text-xs text-brown">Fittja {product.stock.fittja} · Märsta {product.stock.marsta}</span>
+              <span className="mt-1 block text-sm text-muted">{priceSpan(product).from ? `från ${sek(priceSpan(product).amount)}` : sek(unitPrice(product))}</span>
+              <span className="mt-1 block text-xs text-brown">{hasVariants(product) ? `${product.variants?.length} storlekar` : `Fittja ${product.stock.fittja} · Märsta ${product.stock.marsta}`}</span>
             </Link>
             <button type="button" data-handle="1" className="mt-2 h-11 w-full rounded-full bg-cream text-sm" aria-label={`Flytta ${product.name}`}>Håll och dra</button>
           </li>
@@ -181,10 +182,13 @@ export function ProductForm({ id }: { id: string }) {
             {Object.entries(CATEGORY_LABEL).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
           </select>
         </Label>
-        <div className="grid grid-cols-2 gap-3">
-          <Stepper label="Fittja" value={product.stock.fittja} onChange={(value) => patch({ stock: { ...product.stock, fittja: value } })} />
-          <Stepper label="Märsta" value={product.stock.marsta} onChange={(value) => patch({ stock: { ...product.stock, marsta: value } })} />
-        </div>
+        {(product.variants?.length ?? 0) === 0 && (
+          <div className="grid grid-cols-2 gap-3">
+            <Stepper label="Fittja" value={product.stock.fittja} onChange={(value) => patch({ stock: { ...product.stock, fittja: value } })} />
+            <Stepper label="Märsta" value={product.stock.marsta} onChange={(value) => patch({ stock: { ...product.stock, marsta: value } })} />
+          </div>
+        )}
+        <VariantEditor variants={product.variants ?? []} onChange={(variants) => patch({ variants })} />
         <div className="grid grid-cols-2 gap-2">
           <Toggle on={product.offer} label="Erbjudande" onClick={() => patch({ offer: !product.offer })} />
           <Toggle on={product.news} label="Nyhet" onClick={() => patch({ news: !product.news })} />
@@ -228,6 +232,37 @@ export function ProductForm({ id }: { id: string }) {
           <button type="button" className="mt-4 h-12 w-full rounded-full bg-red-900 text-white" onClick={async () => { await api(`/api/products/${id}`, { method: "DELETE" }); setDirty(false); router.push("/admin/produkter"); }}>Ja, ta bort</button>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function VariantEditor({ variants, onChange }: { variants: ProductVariant[]; onChange: (variants: ProductVariant[]) => void }) {
+  function update(index: number, partial: Partial<ProductVariant>) {
+    onChange(variants.map((variant, variantIndex) => variantIndex === index ? { ...variant, ...partial } : variant));
+  }
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-medium text-brown">Storlekar</p>
+        <button type="button" className="h-11 rounded-full bg-paper px-4 text-sm" onClick={() => onChange([...variants, { id: "", label: "", price: 0, stock: { fittja: 0, marsta: 0 } }])}>Lägg till</button>
+      </div>
+      <p className="mt-1 text-sm text-muted">En sida, flera storlekar. Tom lista betyder ett pris.</p>
+      <ul className="mt-3 space-y-3">
+        {variants.map((variant, index) => (
+          <li key={`${variant.id}-${index}`} className="rounded-3xl border border-[#e4d3b4] bg-white p-3">
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Label>Namn<Input className="h-12" value={variant.label} placeholder="1kg" onChange={(event) => update(index, { label: event.target.value })} /></Label>
+              <Label>Pris (kr)<Input className="h-12" inputMode="numeric" type="number" value={variant.price} onChange={(event) => update(index, { price: Number(event.target.value) })} /></Label>
+              <Label>SumUp-SKU<Input className="h-12" value={variant.sumupSku ?? ""} onChange={(event) => update(index, { sumupSku: event.target.value })} /></Label>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-3">
+              <Stepper label="Fittja" value={variant.stock.fittja} onChange={(value) => update(index, { stock: { ...variant.stock, fittja: value } })} />
+              <Stepper label="Märsta" value={variant.stock.marsta} onChange={(value) => update(index, { stock: { ...variant.stock, marsta: value } })} />
+            </div>
+            <button type="button" className="mt-2 h-11 text-sm text-red-900 underline" onClick={() => onChange(variants.filter((_, variantIndex) => variantIndex !== index))}>Ta bort storlek</button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

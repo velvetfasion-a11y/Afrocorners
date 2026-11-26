@@ -5,6 +5,7 @@ import { tmpdir } from "os";
 import path from "path";
 import { unitPrice } from "../format";
 import { normalizeOffers, pickOffer, stockholmDate, type CustomerProfile, type ShopOffer } from "../offers";
+import { findVariant, variantImage, variantTitle } from "../variants";
 import { applyOrderStock, commitMovement, reverseOrderStock, type CommitResult } from "../inventory";
 import { createSeed } from "../seed";
 import type { Database, Order, Product, SiteContent, StockLogEntry, StockMovementInput, StoreId, SumupState } from "../types";
@@ -117,7 +118,7 @@ async function firebaseCommit(input: StockMovementInput): Promise<CommitResult> 
         return product;
       },
       async saveProduct(next: Product) {
-        tx.update(ref, { stock: next.stock });
+        tx.update(ref, next.variants?.length ? { stock: next.stock, variants: next.variants } : { stock: next.stock });
       },
       async findLogByExternalRef() {
         return null;
@@ -229,7 +230,7 @@ export async function saveSumupState(sumup: SumupState): Promise<void> {
 }
 
 export async function createPricedOrder(input: {
-  items: { productId: string; qty: number }[];
+  items: { productId: string; variantId?: string; qty: number }[];
   fulfilment: Order["fulfilment"];
   pickupStoreId: StoreId | null;
   customer: Order["customer"];
@@ -245,12 +246,16 @@ export async function createPricedOrder(input: {
     if (qty < 1 || qty > 99) throw new Error("Antalet måste vara mellan 1 och 99.");
     const product = db.products.find((item) => item.id === line.productId && item.active);
     if (!product) throw new Error("En vara finns inte längre.");
+    const variant = line.variantId ? findVariant(product, line.variantId) : undefined;
+    if (line.variantId && !variant) throw new Error("Storleken finns inte längre.");
+    if ((product.variants?.length ?? 0) > 0 && !variant) throw new Error("Välj storlek.");
     items.push({
       productId: product.id,
-      name: product.name,
+      variantId: variant?.id,
+      name: variantTitle(product, variant),
       qty,
-      unitPrice: unitPrice(product),
-      image: product.images[0] ?? "",
+      unitPrice: variant ? variant.price : unitPrice(product),
+      image: variantImage(product, variant),
     });
   }
   if (items.length === 0) throw new Error("Varukorgen är tom.");

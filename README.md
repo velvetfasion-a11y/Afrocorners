@@ -72,6 +72,15 @@ Kunder kan läsa katalogen. En inloggad kund kan bara läsa och skriva sitt eget
 
 På `/konto` loggar kunden in med Google, samma `NEXT_PUBLIC_FIREBASE_*` som admin. Inga nya miljövariabler behövs. Rabatter ställs under **Admin → Erbjudanden**.
 
+Storlekar som importerats som egna varor (`Black Eye Beans – 2kg`) kan slås ihop till en vara med varianter. Torrkörning skriver inget:
+
+```bash
+npx tsx scripts/merge-variants.ts
+npx tsx scripts/merge-variants.ts --apply
+```
+
+`--apply` kräver `FIREBASE_SERVICE_ACCOUNT` eller `FIREBASE_SERVICE_ACCOUNT_PATH`. Kör den mot produktionen själv. Ett andra anrop gör inget om sammanslagningen redan är gjord. Publicera `firestore.rules` igen efter den här ändringen.
+
 ## Beställning
 
 Kunden väljer hemleverans eller hämtning i Fittja eller Märsta och trycker **WhatsApp** eller **SMS**. Meddelandet går till butikens nummer i formatet `+46` (`wa.me`). På en mobil som kan dela filer följer produktbilderna med i delningen. Annars ligger bildlänkar i texten. Ordern sparas och syns under **Ordrar**.

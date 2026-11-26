@@ -4,12 +4,15 @@ import { Minus, Plus } from "lucide-react";
 import Link from "next/link";
 import { badgeFor, sek, unitPrice } from "@/lib/format";
 import type { Product } from "@/lib/types";
+import { hasVariants, priceSpan } from "@/lib/variants";
 import { useShop } from "./shell";
 
 export function ProductCard({ product }: { product: Product }) {
   const { cart, add, setQty } = useShop();
+  const sized = hasVariants(product);
   const qty = cart[product.id] ?? 0;
-  const price = unitPrice(product);
+  const span = priceSpan(product);
+  const price = sized ? span.amount : unitPrice(product);
   const badge = badgeFor(product);
   return (
     <article className="flex h-full flex-col">
@@ -27,9 +30,13 @@ export function ProductCard({ product }: { product: Product }) {
           {product.salePrice != null && product.salePrice < product.price && (
             <span className="mr-1 text-muted line-through">{sek(product.price)}</span>
           )}
-          <span className="font-medium">{sek(price)}</span>
+          <span className="font-medium">{span.from ? `från ${sek(price)}` : sek(price)}</span>
         </p>
-        {qty > 0 ? (
+        {sized ? (
+          <Link href={`/produkt/${product.slug}`} className="gold-btn grid h-10 w-10 place-items-center rounded-full" aria-label={`Välj storlek för ${product.name}`}>
+            <Plus className="h-4 w-4" />
+          </Link>
+        ) : qty > 0 ? (
           <div className="flex items-center rounded-full border border-line bg-paper">
             <button type="button" className="grid h-10 w-10 place-items-center" aria-label={`Minska ${product.name}`} onClick={() => setQty(product.id, qty - 1)}>
               <Minus className="h-4 w-4" />

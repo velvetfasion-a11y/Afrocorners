@@ -19,6 +19,16 @@ export interface StoreLocation {
   closedDates: string[];
 }
 
+export interface ProductVariant {
+  id: string;
+  /** Shown on the product page, e.g. "1kg" or "Vanilla". */
+  label: string;
+  price: number;
+  stock: Record<StoreId, number>;
+  sumupSku?: string;
+  image?: string;
+}
+
 export interface Product {
   id: string;
   slug: string;
@@ -35,6 +45,8 @@ export interface Product {
   sortOrder: number;
   stock: Record<StoreId, number>;
   active: boolean;
+  /** Sizes or flavours sold on this one page. Absent when the product has a single price. */
+  variants?: ProductVariant[];
 }
 
 export type OrderStatus = "ny" | "bekraftad" | "betald" | "klar" | "avbruten";
@@ -43,6 +55,7 @@ export type Fulfilment = "delivery" | "pickup";
 
 export interface OrderItem {
   productId: string;
+  variantId?: string;
   name: string;
   qty: number;
   unitPrice: number;
@@ -59,6 +72,7 @@ export interface OrderCustomer {
 
 export interface StockDeduction {
   productId: string;
+  variantId?: string;
   storeId: StoreId;
   qty: number;
 }
@@ -102,6 +116,7 @@ export interface StockLogEntry {
   createdAt: string;
   storeId: StoreId;
   productId: string;
+  variantId?: string;
   productName: string;
   /** Signed. Negative means stock left the shelf. */
   change: number;
@@ -116,6 +131,7 @@ export interface StockLogEntry {
 export interface StockMovementInput {
   storeId: StoreId;
   productId: string;
+  variantId?: string;
   delta: number;
   reason: StockReason;
   source: StockSource;

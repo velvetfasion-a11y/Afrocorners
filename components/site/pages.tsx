@@ -4,8 +4,9 @@ import { Heart, Minus, Plus } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { badgeFor, normalizeName, sek, toE164, unitPrice } from "@/lib/format";
+import { badgeFor, normalizeName, sek, toE164 } from "@/lib/format";
 import { offerSummary } from "@/lib/offers";
+import { cartKey, defaultVariant, findVariant, hasVariants, parseCartKey, storeQty, variantImage, variantPrice, variantTitle } from "@/lib/variants";
 import { buildOrderMessage, smsUrl, whatsappUrl } from "@/lib/orders";
 import type { Order, Product, StoreId } from "@/lib/types";
 import { ProductGrid } from "./product-card";
@@ -77,43 +78,60 @@ export function FavoritesPage() {
 }
 
 function availability(name: string, qty: number) {
-  return qty > 0 ? `Finns i ${name}` : `Slut i lager i ${name}`;
+  return qty > 0 ? `I lager ${name}` : "Slut i lager";
 }
 
 export function ProductPage({ slug }: { slug: string }) {
   const { products, content, add, cart, toggleFavorite, favorites } = useShop();
   const product = products.find((item) => item.slug === slug);
   const [qty, setQty] = useState(1);
+  const [variantId, setVariantId] = useState("");
   if (!product) return <div className="wrap py-16"><p>Varan finns inte.</p><Link href="/" className="underline">Till startsidan</Link></div>;
-  const price = unitPrice(product);
+  const variants = product.variants ?? [];
+  const selectedId = variants.some((variant) => variant.id === variantId) ? variantId : (defaultVariant(product)?.id ?? "");
+  const variant = findVariant(product, selectedId);
+  const price = variantPrice(product, variant);
   const loved = favorites.includes(product.id);
+  const inCart = cart[cartKey(product.id, variant?.id)] ?? 0;
   const related = products.filter((item) => item.category === product.category && item.id !== product.id).slice(0, 4);
   return (
     <div className="wrap py-8">
       <div className="grid gap-8 md:grid-cols-2">
-        <img src={product.images[0]} alt={product.name} className="w-full rounded-[1.6rem] object-cover" />
+        <img src={variantImage(product, variant)} alt={variantTitle(product, variant)} className="w-full rounded-[1.6rem] object-cover" />
         <div>
           <p className="text-sm uppercase tracking-[0.16em] text-muted">{content.categories.find((item) => item.id === product.category)?.name}</p>
           <h1 className="mt-2 font-display text-4xl">{product.name}</h1>
+          {variants.length > 0 && (
+            <div className="mt-4 flex flex-wrap gap-2" role="radiogroup" aria-label="Storlek">
+              {variants.map((item) => {
+                const on = item.id === selectedId;
+                return (
+                  <button key={item.id} type="button" role="radio" aria-checked={on} className={`h-11 rounded-full px-4 text-sm ${on ? "bg-bark text-cream" : "border border-[#e4d3b4] bg-white text-ink"}`} onClick={() => setVariantId(item.id)}>
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           <p className="mt-4 text-lg">
-            {product.salePrice != null && product.salePrice < product.price && <span className="mr-2 text-muted line-through">{sek(product.price)}</span>}
+            {!variant && product.salePrice != null && product.salePrice < product.price && <span className="mr-2 text-muted line-through">{sek(product.price)}</span>}
             <span className="font-medium">{sek(price)}</span>
             {badgeFor(product) && <span className="ml-2 rounded-full bg-bark px-2 py-1 text-xs text-cream">{badgeFor(product)}</span>}
           </p>
           <p className="mt-4 leading-7 text-brown">{product.description}</p>
           <ul className="mt-4 space-y-1 text-sm">
-            <li className={product.stock.fittja > 0 ? "text-good" : "text-gold-deep"}>{availability("Fittja", product.stock.fittja)}</li>
-            <li className={product.stock.marsta > 0 ? "text-good" : "text-gold-deep"}>{availability("Märsta", product.stock.marsta)}</li>
+            <li className={storeQty(product, "fittja", variant) > 0 ? "text-good" : "text-gold-deep"}>{availability("Fittja", storeQty(product, "fittja", variant))}{storeQty(product, "fittja", variant) <= 0 ? " · Fittja" : ""}</li>
+            <li className={storeQty(product, "marsta", variant) > 0 ? "text-good" : "text-gold-deep"}>{availability("Märsta", storeQty(product, "marsta", variant))}{storeQty(product, "marsta", variant) <= 0 ? " · Märsta" : ""}</li>
           </ul>
-          {product.stock.fittja + product.stock.marsta === 0 && <p className="mt-2 text-sm text-muted">Vi bekräftar lager när vi svarar.</p>}
+          {storeQty(product, "fittja", variant) + storeQty(product, "marsta", variant) === 0 && <p className="mt-2 text-sm text-muted">Vi bekräftar lager när vi svarar.</p>}
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <div className="flex items-center rounded-full border border-line bg-paper">
               <button type="button" className="grid h-12 w-12 place-items-center" aria-label="Minska antal" onClick={() => setQty((value) => Math.max(1, value - 1))}><Minus /></button>
               <span className="w-8 text-center">{qty}</span>
               <button type="button" className="grid h-12 w-12 place-items-center" aria-label="Öka antal" onClick={() => setQty((value) => Math.min(99, value + 1))}><Plus /></button>
             </div>
-            <button type="button" className="gold-btn h-12 rounded-full px-6" onClick={() => add(product.id, qty)}>
-              Lägg i varukorg{cart[product.id] ? ` (${cart[product.id]} i korgen)` : ""}
+            <button type="button" className="gold-btn h-12 rounded-full px-6" onClick={() => add(product.id, qty, variant?.id)}>
+              Lägg i varukorg{inCart ? ` (${inCart} i korgen)` : ""}
             </button>
             <button type="button" className="grid h-12 w-12 place-items-center rounded-full border border-line" aria-label="Favorit" onClick={() => toggleFavorite(product.id)}>
               <Heart className={loved ? "fill-gold text-gold" : ""} />
@@ -131,10 +149,21 @@ export function ProductPage({ slug }: { slug: string }) {
   );
 }
 
+function cartLines(products: Product[], cart: Record<string, number>) {
+  return Object.entries(cart).flatMap(([key, qty]) => {
+    const parsed = parseCartKey(key);
+    const product = products.find((item) => item.id === parsed.productId);
+    if (!product || qty <= 0) return [];
+    const variant = findVariant(product, parsed.variantId);
+    if (hasVariants(product) && !variant) return [];
+    return [{ key, product, variant, qty, price: variantPrice(product, variant) }];
+  });
+}
+
 export function CartPage() {
   const { products, cart, setQty, content, quote, account } = useShop();
-  const lines = Object.entries(cart).map(([id, qty]) => ({ product: products.find((item) => item.id === id), qty })).filter((line) => line.product);
-  const subtotal = lines.reduce((sum, line) => sum + unitPrice(line.product as Product) * line.qty, 0);
+  const lines = cartLines(products, cart);
+  const subtotal = lines.reduce((sum, line) => sum + line.price * line.qty, 0);
   const deal = quote(subtotal);
   const total = subtotal - (deal?.discount ?? 0);
   const left = content.freeShippingThreshold - subtotal;
@@ -146,24 +175,21 @@ export function CartPage() {
       ) : (
         <div className="mt-6 grid gap-8 lg:grid-cols-[1fr_18rem]">
           <ul className="space-y-4">
-            {lines.map((line) => {
-              const product = line.product as Product;
-              return (
-                <li key={product.id} className="flex gap-3 rounded-3xl bg-paper p-3">
-                  <img src={product.images[0]} alt="" className="h-24 w-24 rounded-2xl object-cover" />
+            {lines.map((line) => (
+                <li key={line.key} className="flex gap-3 rounded-3xl bg-paper p-3">
+                  <img src={variantImage(line.product, line.variant)} alt="" className="h-24 w-24 rounded-2xl object-cover" />
                   <div className="flex-1">
-                    <Link href={`/produkt/${product.slug}`} className="font-medium">{product.name}</Link>
-                    <p className="text-sm text-muted">{sek(unitPrice(product))}</p>
+                    <Link href={`/produkt/${line.product.slug}`} className="font-medium">{variantTitle(line.product, line.variant)}</Link>
+                    <p className="text-sm text-muted">{sek(line.price)}</p>
                     <div className="mt-2 flex items-center gap-2">
-                      <button type="button" className="grid h-10 w-10 place-items-center rounded-full border border-line" aria-label="Minska" onClick={() => setQty(product.id, line.qty - 1)}><Minus className="h-4 w-4" /></button>
+                      <button type="button" className="grid h-10 w-10 place-items-center rounded-full border border-line" aria-label="Minska" onClick={() => setQty(line.product.id, line.qty - 1, line.variant?.id)}><Minus className="h-4 w-4" /></button>
                       <span>{line.qty}</span>
-                      <button type="button" className="grid h-10 w-10 place-items-center rounded-full border border-line" aria-label="Öka" onClick={() => setQty(product.id, line.qty + 1)}><Plus className="h-4 w-4" /></button>
-                      <button type="button" className="ml-auto text-sm text-muted underline" onClick={() => setQty(product.id, 0)}>Ta bort</button>
+                      <button type="button" className="grid h-10 w-10 place-items-center rounded-full border border-line" aria-label="Öka" onClick={() => setQty(line.product.id, line.qty + 1, line.variant?.id)}><Plus className="h-4 w-4" /></button>
+                      <button type="button" className="ml-auto text-sm text-muted underline" onClick={() => setQty(line.product.id, 0, line.variant?.id)}>Ta bort</button>
                     </div>
                   </div>
                 </li>
-              );
-            })}
+            ))}
           </ul>
           <aside className="h-fit rounded-3xl bg-paper p-5">
             <p className="text-sm text-muted">Att betala hos butiken</p>
@@ -184,7 +210,7 @@ export function CartPage() {
 export function CheckoutPage() {
   const { products, cart, content, clearCart, quote, account, refreshAccount } = useShop();
   const router = useRouter();
-  const lines = Object.entries(cart).map(([id, qty]) => ({ product: products.find((item) => item.id === id), qty })).filter((line): line is { product: Product; qty: number } => Boolean(line.product));
+  const lines = cartLines(products, cart);
   const [fulfilment, setFulfilment] = useState<"delivery" | "pickup">("delivery");
   const [storeId, setStoreId] = useState<StoreId>("fittja");
   const [customer, setCustomer] = useState({ name: "", phone: "", address: "", postalCode: "", city: "" });
@@ -192,7 +218,7 @@ export function CheckoutPage() {
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [order, setOrder] = useState<Order | null>(null);
-  const subtotal = lines.reduce((sum, line) => sum + unitPrice(line.product) * line.qty, 0);
+  const subtotal = lines.reduce((sum, line) => sum + line.price * line.qty, 0);
   const deal = quote(subtotal);
   const total = subtotal - (deal?.discount ?? 0);
   useEffect(() => {
@@ -219,7 +245,7 @@ export function CheckoutPage() {
       method: "POST",
       headers,
       body: JSON.stringify({
-        items: lines.map((line) => ({ productId: line.product.id, qty: line.qty })),
+        items: lines.map((line) => ({ productId: line.product.id, variantId: line.variant?.id, qty: line.qty })),
         fulfilment,
         pickupStoreId: storeId,
         customer,
@@ -331,8 +357,8 @@ export function CheckoutPage() {
           <ul className="space-y-2 text-sm">
             {lines.map((line) => (
               <li key={line.product.id} className="flex justify-between gap-3">
-                <span>{line.qty} × {line.product.name}</span>
-                <span>{sek(unitPrice(line.product) * line.qty)}</span>
+                <span>{line.qty} × {variantTitle(line.product, line.variant)}</span>
+                <span>{sek(line.price * line.qty)}</span>
               </li>
             ))}
           </ul>

@@ -15,7 +15,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   const body = (await req.json().catch(() => null)) as {
-    items?: { productId: string; qty: number }[];
+    items?: { productId: string; variantId?: string; qty: number }[];
     fulfilment?: Fulfilment;
     pickupStoreId?: StoreId | null;
     customer?: { name?: string; phone?: string; address?: string; postalCode?: string; city?: string };

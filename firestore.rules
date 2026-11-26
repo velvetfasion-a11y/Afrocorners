@@ -19,9 +19,52 @@ service cloud.firestore {
         && adminData().role in ["owner", "developer"];
     }
 
+    function isValidVariant(variant) {
+      return variant.id is string
+        && variant.id.size() > 0
+        && variant.id.size() <= 80
+        && variant.label is string
+        && variant.label.size() > 0
+        && variant.label.size() <= 40
+        && variant.price is number
+        && variant.price >= 0
+        && variant.price <= 1000000
+        && variant.stock is map
+        && variant.stock.fittja is number
+        && variant.stock.marsta is number
+        && variant.stock.fittja >= 0
+        && variant.stock.marsta >= 0
+        && variant.stock.fittja <= 100000
+        && variant.stock.marsta <= 100000;
+    }
+
+    function variantSlot(variants, index) {
+      return index >= variants.size() || isValidVariant(variants[index]);
+    }
+
+    function variantsOk(data) {
+      return !data.keys().hasAny(["variants"])
+        || data.variants == null
+        || (data.variants is list
+          && data.variants.size() <= 12
+          && variantSlot(data.variants, 0)
+          && variantSlot(data.variants, 1)
+          && variantSlot(data.variants, 2)
+          && variantSlot(data.variants, 3)
+          && variantSlot(data.variants, 4)
+          && variantSlot(data.variants, 5)
+          && variantSlot(data.variants, 6)
+          && variantSlot(data.variants, 7)
+          && variantSlot(data.variants, 8)
+          && variantSlot(data.variants, 9)
+          && variantSlot(data.variants, 10)
+          && variantSlot(data.variants, 11));
+    }
+
     match /products/{id} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow create, update: if isAdmin() && variantsOk(request.resource.data);
+      allow delete: if isAdmin();
     }
 
     match /content/{id} {

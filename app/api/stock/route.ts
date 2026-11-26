@@ -20,6 +20,7 @@ export async function POST(req: Request) {
     const result = await applyMovement({
       storeId: body.storeId,
       productId: body.productId,
+      variantId: body.variantId,
       delta,
       reason: body.reason,
       source: "admin",

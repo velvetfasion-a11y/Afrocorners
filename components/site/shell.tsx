@@ -7,6 +7,7 @@ import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useStat
 import { AfricaMark } from "@/components/AfricaMark";
 import { offerSummary, pickOffer, stockholmDate } from "@/lib/offers";
 import type { IconName, Product, SiteContent } from "@/lib/types";
+import { cartKey } from "@/lib/variants";
 import { useCustomerSession, type ShopAccount } from "./customer-auth";
 import { StoreCard, useNow } from "./store-bits";
 
@@ -17,8 +18,8 @@ interface ShopValue {
   content: SiteContent;
   cart: Cart;
   favorites: string[];
-  add: (id: string, qty?: number) => void;
-  setQty: (id: string, qty: number) => void;
+  add: (id: string, qty?: number, variantId?: string) => void;
+  setQty: (id: string, qty: number, variantId?: string) => void;
   toggleFavorite: (id: string) => void;
   clearCart: () => void;
   refresh: () => Promise<void>;
@@ -305,14 +306,16 @@ export function ShopShell({
       if (!account) return null;
       return pickOffer(account.offers, account.customer, subtotal, stockholmDate());
     },
-    add(id, qty = 1) {
-      setCart((current) => ({ ...current, [id]: Math.min(99, (current[id] ?? 0) + qty) }));
+    add(id, qty = 1, variantId) {
+      const key = cartKey(id, variantId);
+      setCart((current) => ({ ...current, [key]: Math.min(99, (current[key] ?? 0) + qty) }));
     },
-    setQty(id, qty) {
+    setQty(id, qty, variantId) {
+      const key = cartKey(id, variantId);
       setCart((current) => {
         const next = { ...current };
-        if (qty <= 0) delete next[id];
-        else next[id] = Math.min(99, qty);
+        if (qty <= 0) delete next[key];
+        else next[key] = Math.min(99, qty);
         return next;
       });
     },

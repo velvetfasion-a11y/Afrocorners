@@ -1,10 +1,17 @@
 import { normalizeName } from "../format";
 import type { StockMovementInput, StoreId, SumupPending, SumupPendingKind } from "../types";
 
+export interface PlanVariant {
+  id: string;
+  label: string;
+  sumupSku?: string;
+}
+
 export interface PlanProduct {
   id: string;
   name: string;
   sku: string;
+  variants?: PlanVariant[];
 }
 
 export interface PlanMapping {
@@ -45,6 +52,7 @@ export interface AppliedSaleLine {
   saleId: string;
   lineId: string;
   productId: string;
+  variantId?: string;
   productName: string;
   storeId: StoreId;
   qty: number;
@@ -105,8 +113,26 @@ export function matchProduct(line: Pick<PlanLine, "sku" | "name" | "catalogRefer
     (sku ? mapped(`sku:${sku}`) : null) ||
     (name ? mapped(`name:${name}`) : null) ||
     (sku ? products.find((product) => normalizeName(product.sku) === sku) ?? null : null) ||
-    (name ? products.find((product) => normalizeName(product.name) === name) ?? null : null)
+    (name ? products.find((product) => normalizeName(product.name) === name) ?? null : null) ||
+    (name ? products.find((product) => product.variants?.some((variant) => normalizeName(`${product.name} – ${variant.label}`) === name)) ?? null : null)
   );
+}
+
+export function matchVariant(line: Pick<PlanLine, "sku" | "name">, product: PlanProduct): PlanVariant | null {
+  const variants = product.variants ?? [];
+  if (variants.length === 0) return null;
+  const sku = normalizeName(line.sku);
+  if (sku) {
+    const bySku = variants.find((variant) => variant.sumupSku && normalizeName(variant.sumupSku) === sku);
+    if (bySku) return bySku;
+  }
+  const name = normalizeName(line.name);
+  const productName = normalizeName(product.name);
+  return variants.find((variant) => {
+    const label = normalizeName(variant.label);
+    const full = normalizeName(`${product.name} – ${variant.label}`);
+    return name === full || name === label || (name.startsWith(productName) && name.endsWith(label));
+  }) ?? null;
 }
 
 function pendingBase(line: PlanLine, kind: SumupPendingKind, detail: string, storeId: StoreId | null, now: string): SumupPending {
@@ -161,6 +187,12 @@ export function planSumupSync(input: {
       );
       continue;
     }
+    const variant = matchVariant(line, product);
+    if ((product.variants?.length ?? 0) > 0 && !variant) {
+      pending.push(pendingBase(line, "unmatched_product", "Storleken matchade ingen variant. Koppla den manuellt.", storeId, now));
+      continue;
+    }
+    const label = variant ? `${product.name} – ${variant.label}` : product.name;
     const returning = line.operation === "return";
     if (returning) returnSales.add(`${line.merchantCode}:${line.saleId}`);
     else {
@@ -169,7 +201,8 @@ export function planSumupSync(input: {
         saleId: line.saleId,
         lineId: line.lineId,
         productId: product.id,
-        productName: product.name,
+        variantId: variant?.id,
+        productName: label,
         storeId,
         qty: pieces.pieces,
       });
@@ -177,7 +210,8 @@ export function planSumupSync(input: {
     intents.push({
       storeId,
       productId: product.id,
-      productName: product.name,
+      variantId: variant?.id,
+      productName: label,
       delta: returning ? pieces.pieces : -pieces.pieces,
       reason: returning ? "SumUp-retur" : "SumUp-försäljning",
       source: "sumup",
@@ -232,6 +266,7 @@ export function planSumupSync(input: {
       intents.push({
         storeId: line.storeId,
         productId: line.productId,
+        variantId: line.variantId,
         productName: line.productName,
         delta: line.qty,
         reason: "SumUp-retur",

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { InlineNote, Loading, storeName, useBundle, useCatalog } from "@/components/admin/bits";
 import { api } from "@/components/admin/api";
 import { Input } from "@/components/ui/input";
-import { REASON_LABEL, type Product, type StockReason, type StoreId } from "@/lib/types";
+import { REASON_LABEL, type Product, type ProductVariant, type StockReason, type StoreId } from "@/lib/types";
 
 type View = "salt" | "in" | "logg";
 
@@ -43,8 +43,21 @@ export function LogPage() {
   return <StockHub initial="logg" />;
 }
 
-async function move(productId: string, storeId: StoreId, delta: number, reason: StockReason) {
-  await api("/api/stock", { method: "POST", body: JSON.stringify({ productId, storeId, delta, reason }) });
+async function move(productId: string, storeId: StoreId, delta: number, reason: StockReason, variantId?: string) {
+  await api("/api/stock", { method: "POST", body: JSON.stringify({ productId, variantId, storeId, delta, reason }) });
+}
+
+function stockRows(product: Product, storeId: StoreId) {
+  if (product.variants?.length) {
+    return product.variants.map((variant: ProductVariant) => ({
+      key: `${product.id}:${variant.id}`,
+      product,
+      variantId: variant.id,
+      name: `${product.name} – ${variant.label}`,
+      level: variant.stock[storeId] ?? 0,
+    }));
+  }
+  return [{ key: product.id, product, variantId: undefined as string | undefined, name: product.name, level: product.stock[storeId] ?? 0 }];
 }
 
 function StorePicker({ storeId, onChange }: { storeId: StoreId; onChange: (id: StoreId) => void }) {
@@ -76,18 +89,18 @@ function PosPanel() {
   const [q, setQ] = useState("");
   const [qty, setQty] = useState<Record<string, string>>({});
   const [note, setNote] = useState("");
-  const [undo, setUndo] = useState<{ product: Product; amount: number } | null>(null);
+  const [undo, setUndo] = useState<{ productId: string; variantId?: string; name: string; amount: number } | null>(null);
   const [kassa, setKassa] = useState(false);
   useEffect(() => {
     fetch("/api/sumup/status").then((response) => response.json()).then((body) => setKassa(Boolean(body.configured))).catch(() => setKassa(false));
   }, []);
-  const products = useMemo(() => (data?.products ?? []).filter((product) => `${product.name} ${product.sku}`.toLowerCase().includes(q.toLowerCase())), [data, q]);
-  async function sell(product: Product, amount: number) {
+  const rows = useMemo(() => (data?.products ?? []).filter((product) => product.active !== false).flatMap((product) => stockRows(product, storeId)).filter((row) => row.name.toLowerCase().includes(q.toLowerCase())), [data, q, storeId]);
+  async function sell(row: (typeof rows)[number], amount: number) {
     const sold = Math.abs(amount);
-    await move(product.id, storeId, -sold, "in_store_sale");
+    await move(row.product.id, storeId, -sold, "in_store_sale", row.variantId);
     if (navigator.vibrate) navigator.vibrate(12);
-    setUndo({ product, amount: sold });
-    setNote(`${product.name}: ${Math.max(0, product.stock[storeId] - sold)} kvar i ${storeName(storeId)}.`);
+    setUndo({ productId: row.product.id, variantId: row.variantId, name: row.name, amount: sold });
+    setNote(`${row.name}: ${Math.max(0, row.level - sold)} kvar i ${storeName(storeId)}.`);
     reload();
   }
   if (!data) return <Loading label="Hämtar lagret…" />;
@@ -96,18 +109,18 @@ function PosPanel() {
       {kassa && <p className="mb-3 text-sm text-brown">Kassan synkas automatiskt.</p>}
       <StorePicker storeId={storeId} onChange={choose} />
       <Input className="mt-3 h-12" placeholder="Sök vara" value={q} onChange={(event) => setQ(event.target.value)} aria-label="Sök vara" />
-      {note && <div className="mt-3"><InlineNote>{note} {undo && <button type="button" className="underline" onClick={async () => { await move(undo.product.id, storeId, undo.amount, "manual"); setUndo(null); setNote("Ångrat."); reload(); }}>Ångra</button>}</InlineNote></div>}
-      {products.length === 0 && <p className="mt-6 text-center text-muted">Ingen vara med det namnet.</p>}
+      {note && <div className="mt-3"><InlineNote>{note} {undo && <button type="button" className="underline" onClick={async () => { await move(undo.productId, storeId, undo.amount, "manual", undo.variantId); setUndo(null); setNote("Ångrat."); reload(); }}>Ångra</button>}</InlineNote></div>}
+      {rows.length === 0 && <p className="mt-6 text-center text-muted">Ingen vara med det namnet.</p>}
       <ul className="mt-4 grid grid-cols-2 gap-3">
-        {products.map((product) => (
-          <li key={product.id} className="rounded-3xl bg-paper p-2">
-            <img src={product.images[0]} alt="" className="aspect-square w-full rounded-2xl object-cover" />
-            <p className="mt-2 text-sm font-medium leading-tight">{product.name}</p>
-            <p className="font-display text-3xl">{product.stock[storeId]}</p>
-            <button type="button" className="mt-2 h-12 w-full rounded-full bg-bark text-cream" onClick={() => sell(product, 1)}>−1</button>
+        {rows.map((row) => (
+          <li key={row.key} className="rounded-3xl bg-paper p-2">
+            <img src={row.product.images[0]} alt="" className="aspect-square w-full rounded-2xl object-cover" />
+            <p className="mt-2 text-sm font-medium leading-tight">{row.name}</p>
+            <p className="font-display text-3xl">{row.level}</p>
+            <button type="button" className="mt-2 h-12 w-full rounded-full bg-bark text-cream" onClick={() => sell(row, 1)}>−1</button>
             <div className="mt-2 flex gap-1">
-              <Input className="h-12" inputMode="numeric" value={qty[product.id] ?? ""} placeholder="Antal" aria-label={`Antal ${product.name}`} onChange={(event) => setQty({ ...qty, [product.id]: event.target.value })} />
-              <button type="button" className="h-12 rounded-full bg-cream-2 px-3 text-sm" onClick={() => sell(product, Math.max(1, Math.round(Number(qty[product.id] || 1))))}>Sälj</button>
+              <Input className="h-12" inputMode="numeric" value={qty[row.key] ?? ""} placeholder="Antal" aria-label={`Antal ${row.name}`} onChange={(event) => setQty({ ...qty, [row.key]: event.target.value })} />
+              <button type="button" className="h-12 rounded-full bg-cream-2 px-3 text-sm" onClick={() => sell(row, Math.max(1, Math.round(Number(qty[row.key] || 1))))}>Sälj</button>
             </div>
           </li>
         ))}
@@ -128,18 +141,18 @@ function RestockPanel() {
       <StorePicker storeId={storeId} onChange={choose} />
       {note && <div className="mt-3"><InlineNote>{note}</InlineNote></div>}
       <ul className="mt-4 space-y-3">
-        {data.products.map((product) => (
-          <li key={product.id} className="rounded-3xl bg-paper p-3">
-            <p className="font-medium">{product.name}</p>
-            <p className="text-sm text-muted">Nu: {product.stock[storeId]} i {storeName(storeId)}</p>
+        {data.products.filter((product) => product.active !== false).flatMap((product) => stockRows(product, storeId)).map((row) => (
+          <li key={row.key} className="rounded-3xl bg-paper p-3">
+            <p className="font-medium">{row.name}</p>
+            <p className="text-sm text-muted">Nu: {row.level} i {storeName(storeId)}</p>
             <div className="mt-2 flex gap-2">
-              <Input className="h-12" inputMode="numeric" placeholder="Antal" aria-label={`Inleverans ${product.name}`} value={amounts[product.id] ?? ""} onChange={(event) => setAmounts({ ...amounts, [product.id]: event.target.value })} />
+              <Input className="h-12" inputMode="numeric" placeholder="Antal" aria-label={`Inleverans ${row.name}`} value={amounts[row.key] ?? ""} onChange={(event) => setAmounts({ ...amounts, [row.key]: event.target.value })} />
               <button type="button" className="gold-btn h-12 shrink-0 rounded-full px-4" onClick={async () => {
-                const qty = Math.round(Number(amounts[product.id]));
+                const qty = Math.round(Number(amounts[row.key]));
                 if (!qty) return;
-                await move(product.id, storeId, qty, "restock");
-                setAmounts({ ...amounts, [product.id]: "" });
-                setNote(`${qty} ${product.name} lades till i ${storeName(storeId)}.`);
+                await move(row.product.id, storeId, qty, "restock", row.variantId);
+                setAmounts({ ...amounts, [row.key]: "" });
+                setNote(`${qty} ${row.name} lades till i ${storeName(storeId)}.`);
                 reload();
               }}>Lägg till</button>
             </div>
