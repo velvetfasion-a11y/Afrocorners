@@ -1,9 +1,22 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    function isAdmin() {
+    function signedIn() {
       return request.auth != null
-        && firestore.exists(/databases/(default)/documents/admins/$(request.auth.uid));
+        && request.auth.token.email_verified == true
+        && request.auth.token.firebase.sign_in_provider == "google.com"
+        && request.auth.token.email is string;
+    }
+
+    function adminData() {
+      return firestore.get(/databases/(default)/documents/admins/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && firestore.exists(/databases/(default)/documents/admins/$(request.auth.uid))
+        && adminData().email.lower() == request.auth.token.email.lower()
+        && adminData().role in ["owner", "developer"];
     }
 
     match /products/{fileName} {

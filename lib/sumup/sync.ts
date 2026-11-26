@@ -168,7 +168,12 @@ async function syncMerchant(
     applied,
     products: database.products.filter((product) => product.active).map((product) => ({ id: product.id, name: product.name, sku: product.sku })),
     mappings: sumup.productMappings,
-    locations: sumup.locationMappings,
+    locations: [
+      ...(connection.storeId
+        ? [{ id: `env-${merchantCode}`, kind: "merchant" as const, externalId: merchantCode, label: connection.merchantName, storeId: connection.storeId }]
+        : []),
+      ...sumup.locationMappings.filter((item) => item.externalId !== merchantCode),
+    ],
   });
 
   let appliedCount = 0;

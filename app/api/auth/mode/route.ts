@@ -1,3 +1,4 @@
+import { accessCodeConfigured } from "@/lib/server/access-code";
 import { json } from "@/lib/server/guard";
 import { usingFirebase } from "@/lib/server/firebase-admin";
 
@@ -6,10 +7,9 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const firebase = usingFirebase();
   return json({
-    mode: firebase ? "firebase" : "demo",
-    oauth: Boolean(process.env.SUMUP_CLIENT_ID && process.env.SUMUP_CLIENT_SECRET),
-    demoEmail: firebase ? null : process.env.DEMO_ADMIN_EMAIL || "agare@afrocorner.se",
-    demoPassword: firebase ? null : process.env.DEMO_ADMIN_PASSWORD || "demo1234",
+    mode: firebase ? "google" : "demo",
+    codeRequired: accessCodeConfigured(),
+    ready: firebase ? accessCodeConfigured() : true,
     firebase: firebase
       ? {
           apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,

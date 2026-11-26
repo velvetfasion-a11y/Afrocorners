@@ -7,6 +7,9 @@ import path from "path";
 export interface SessionUser {
   uid: string;
   email: string;
+  role: "owner" | "developer";
+  /** google after both steps, demo only when Firebase is off */
+  method: "google" | "demo";
   exp: number;
 }
 
@@ -33,8 +36,8 @@ async function secret(): Promise<string> {
   return cachedSecret;
 }
 
-export async function signSession(user: Omit<SessionUser, "exp">, days = 14): Promise<string> {
-  const payload: SessionUser = { ...user, exp: Date.now() + days * 24 * 60 * 60 * 1000 };
+export async function signSession(user: Omit<SessionUser, "exp">, hours = 8): Promise<string> {
+  const payload: SessionUser = { ...user, exp: Date.now() + hours * 60 * 60 * 1000 };
   const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
   const sig = createHmac("sha256", await secret()).update(body).digest("base64url");
   return `${body}.${sig}`;
@@ -50,7 +53,7 @@ export async function verifySession(token: string | null | undefined): Promise<S
   if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
   try {
     const user = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as SessionUser;
-    if (!user?.email || !user.exp || user.exp < Date.now()) return null;
+    if (!user?.email || !user.role || !user.exp || user.exp < Date.now()) return null;
     return user;
   } catch {
     return null;
@@ -69,7 +72,7 @@ export function readCookie(req: Request, name = COOKIE): string | null {
 
 export function sessionSetCookie(token: string): string {
   const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
-  return `${COOKIE}=${encodeURIComponent(token)}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${60 * 60 * 24 * 14}${secure}`;
+  return `${COOKIE}=${encodeURIComponent(token)}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${60 * 60 * 8}${secure}`;
 }
 
 export function sessionClearCookie(): string {

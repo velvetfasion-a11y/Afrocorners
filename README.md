@@ -13,11 +13,11 @@ npm run dev
 
 Öppna [http://127.0.0.1:43123](http://127.0.0.1:43123).
 
-Demoläge (inget `.env.local`):
+Demoläge (Firebase är inte ifyllt):
 
 - Butiken sparas i `.data/db.json` på servern.
-- Admin: `agare@afrocorner.se` / `demo1234`
-- Byt lösenord med `DEMO_ADMIN_PASSWORD` innan sidan läggs ut. Demoläget är inte ett skalskydd.
+- `/admin` visar en tydlig lokal förhandsvisning och en knapp, utan lösenord och utan Google.
+- Så fort Firebase är påslaget gäller bara Google plus åtkomstkod. Demoknappen fungerar inte då.
 
 ```bash
 npm test
@@ -26,19 +26,48 @@ npm run seed
 
 `npm run seed` skriver exempeldata till Firestore när en service account är satt. Annars gör den inget, eftersom demoläget redan fyller butiken första gången.
 
-## För butiksägaren
+## Admin-inloggning
 
-1. Skapa ett Firebase-projekt.
-2. Slå på **Authentication → Email/Password** och skapa ett konto åt dig själv.
-3. Skapa Firestore och Storage.
-4. Kopiera webbnyckeln (Firebase config) till `.env.local` som `NEXT_PUBLIC_FIREBASE_*`. Se `.env.example`.
-5. Skapa en service account (**Project settings → Service accounts → Generate new private key**). Lägg JSON-innehållet i `FIREBASE_SERVICE_ACCOUNT` (en rad) eller sökvägen i `FIREBASE_SERVICE_ACCOUNT_PATH`. Den filen får inte in i git.
-6. I Firestore, skapa dokumentet `admins/{uid}` där `{uid}` är användarens User UID från Authentication. Innehållet kan vara `{ "role": "owner" }`. Utan det dokumentet går det inte att logga in.
-7. Publicera `firestore.rules` och `storage.rules` i Firebase-konsolen.
-8. Logga in på `/admin`. Första anropet lägger in exempelvaror om databasen är tom.
-9. Ändra adress, öppettider, telefon (`0705508554` är startvärdet) och meddelandemallen under **Innehåll**.
+Inloggningen har två steg, båda kontrolleras på servern. Sessionen är en signerad cookie (`HttpOnly`, `SameSite=Lax`, `Secure` i produktion) som gäller i 8 timmar. Den skapas först när båda stegen gått igenom. Utan den cookien svarar admin-sidor och API med att man ska logga in igen.
 
-Kunder kan läsa katalogen. De kan bara skapa ordrar med status `ny`. Allt annat kräver ägarkontot. SumUp-nycklar ligger i `private/sumup` eller i `.data/sumup-secrets.json`. Reglerna släpper inte in webbläsaren dit.
+1. **Logga in med Google.** Bara Googles inloggning. E-post och lösenord finns inte. Kontot måste ha verifierad e-post.
+2. **Åtkomstkod.** Koden ligger bara som ett scrypt-hash i `ADMIN_ACCESS_CODE_HASH`. Fel kod fem gånger låser i 15 minuter, per konto och per IP.
+
+Just nu finns ett admin-konto: utvecklaren Julia. Hennes Google-adress sätts vid deploy, inte i koden:
+
+```bash
+ADMIN_EMAILS=julia@example.com:developer
+```
+
+Byt ut adressen mot Julias riktiga Google-konto. Rollen `developer` når även `/admin/dev`. En senare ägare kan läggas till som `owner`.
+
+### Lägga till eller ta bort ett Google-konto
+
+Lägg till: sätt `ADMIN_EMAILS` till en kommaseparerad lista, till exempel `julia@example.com:developer, agare@example.com:owner`, och starta om servern. Personen loggar in med Google och koden. Efter en lyckad inloggning skriver servern `admins/{uid}` med samma e-post och roll, så Firestore-reglerna följer med.
+
+Ta bort: stryk adressen ur `ADMIN_EMAILS` och starta om. Radera också dokumentet `admins/{uid}` i Firestore, annars kan det kontot fortfarande skriva direkt mot databasen. Befintliga cookies dör senast efter 8 timmar.
+
+Om `ADMIN_EMAILS` är tom används bara dokumenten i `admins`. Med listan ifylld räcker det inte att finnas i Firestore: adressen måste stå i miljön.
+
+### Skapa hashet för åtkomstkoden
+
+Kör lokalt. Koden sparas inte och ska inte in i git, och inte hashet heller.
+
+```bash
+npm run hash-access-code
+```
+
+Klistra in raden som skrivs ut i värdens `ADMIN_ACCESS_CODE_HASH`. Saknas hashet när Firebase är påslaget går det inte att logga in.
+
+### Firebase
+
+1. Skapa ett Firebase-projekt. Slå på **Authentication → Google**. E-post/lösenord ska vara av.
+2. Lägg webbnyckeln i `NEXT_PUBLIC_FIREBASE_*`.
+3. Lägg service account i `FIREBASE_SERVICE_ACCOUNT` eller `FIREBASE_SERVICE_ACCOUNT_PATH`.
+4. Publicera `firestore.rules` och `storage.rules`. De kräver Google, `email_verified`, och att `admins/{uid}` har samma e-post och rollen `owner` eller `developer`.
+5. Sätt `ADMIN_EMAILS` och `ADMIN_ACCESS_CODE_HASH`.
+
+Kunder kan läsa katalogen och skapa ordrar med status `ny`. Allt annat kräver den korta sessionen.
 
 ## Beställning
 
@@ -50,7 +79,9 @@ När ordern markeras som **Skickad/Hämtad** minskar lagret. Hämtning tar från
 
 **Sålt i butik** är den snabba telefonvyn: välj Fittja eller Märsta (valet sparas), tryck **−1** eller ange antal. **Lager** har plus/minus och **Inleverans**. Varje ändring hamnar i **Logg** med datum, butik, vara, antal och orsak.
 
-## SumUp
+## SumUp (för oss som sätter upp, inte för ägaren)
+
+Ägaren ser inte SumUp i admin. Hon ser bara lagerändringar med orsaken **SumUp-försäljning** eller **SumUp-retur**, och raden "Kassan synkas automatiskt" när nycklarna är satta.
 
 Kontroll mot [SumUps dokumentation](https://developer.sumup.com/api) (november 2026):
 
@@ -63,14 +94,12 @@ Kontroll mot [SumUps dokumentation](https://developer.sumup.com/api) (november 2
 | Kortläsare | `GET /v0.1/merchants/{code}/readers` | Listas så de kan kopplas, men kvittot innehåller ingen läsar-id. |
 | Webhook | [Checkouts](https://developer.sumup.com/online-payments/webhooks/) `CHECKOUT_STATUS_CHANGED` | Finns på `/api/sumup/webhook?token=…`. SumUp har ingen webhook för vanliga köp i SumUp-appen. |
 
-Så här kopplar du:
+Så här kopplar vi (inte ägaren):
 
-1. I [me.sumup.com](https://me.sumup.com): **Settings → For developers → Toolkit → API keys**. Skapa en hemlig nyckel. SumUp visar den bara en gång.
-2. I admin under **SumUp**, klistra in nyckeln. Den sparas på servern. Gränssnittet visar bara de sista tecknen.
-3. Har du två butiker, skapa **ett SumUp-konto per butik** och lägg in båda nycklarna. Koppla varje merchant code till Fittja eller Märsta.
-4. Lägg samma SKU på varan i AfroCorner och i SumUps katalog (`references.sku`). Namn matchas också, utan hänsyn till stora bokstäver och å/ä/ö.
-5. Sådant som inte matchar hamnar under **Omatchade varor**. Välj produkt och tryck **Koppla**.
-6. **Synka nu**, eller låt Vercel Cron anropa `GET /api/sumup/sync` var tionde minut. Sätt `CRON_SECRET`. Första synken börjar vid dagens datum så gamla kvitton inte tömmer lagret.
+1. I [me.sumup.com](https://me.sumup.com): **Settings → For developers → Toolkit → API keys**. Skapa en hemlig nyckel per butik. SumUp visar den bara en gång.
+2. Sätt `SUMUP_FITTJA_API_KEY` och `SUMUP_FITTJA_MERCHANT_CODE`, och samma par för Märsta. Nycklarna läses bara på servern.
+3. Lägg samma SKU på varan i AfroCorner och i SumUps katalog. Namn matchas också. Omatchade rader syns på `/admin/dev` för kontot med rollen developer, inte i ägarens admin.
+4. Sätt `CRON_SECRET`. Vercel anropar `GET /api/sumup/sync` var tionde minut.
 
 Det här kan SumUp-API:t inte göra, och därför gör sidan det inte heller:
 

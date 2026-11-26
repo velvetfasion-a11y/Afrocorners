@@ -17,6 +17,13 @@ export function isUser(value: SessionUser | NextResponse): value is SessionUser 
   return !(value instanceof NextResponse);
 }
 
+export async function requireDeveloper(req: Request): Promise<SessionUser | NextResponse> {
+  const user = await requireAdmin(req);
+  if (!isUser(user)) return user;
+  if (user.role !== "developer") return json({ error: "Ingen behörighet." }, 403);
+  return user;
+}
+
 export function cronAuthorized(req: Request): boolean {
   const secret = process.env.CRON_SECRET;
   if (!secret) return false;

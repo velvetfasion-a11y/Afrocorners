@@ -2,6 +2,7 @@ import "server-only";
 
 import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
+import type { StoreId } from "../types";
 
 export interface SumupConnection {
   id: string;
@@ -15,6 +16,8 @@ export interface SumupConnection {
   extraMerchantCodes: string[];
   keyHint: string;
   fromEnv?: boolean;
+  /** Which shop this SumUp account's sales belong to. Set from env, not the owner UI. */
+  storeId?: StoreId;
 }
 
 interface SecretFile {
@@ -75,24 +78,36 @@ async function firebaseSecrets(): Promise<{ get: () => Promise<SecretFile | null
   };
 }
 
+function envConnection(storeId: StoreId, apiKey: string | undefined, merchantCode: string | undefined): SumupConnection | null {
+  const key = apiKey?.trim();
+  if (!key) return null;
+  return {
+    id: `env-${storeId}`,
+    authType: "api_key",
+    apiKey: key,
+    merchantCode: merchantCode?.trim() || "",
+    merchantName: storeId === "fittja" ? "Fittja" : "Märsta",
+    extraMerchantCodes: [],
+    keyHint: hint(key),
+    fromEnv: true,
+    storeId,
+  };
+}
+
+/** SumUp accounts come only from server env. The owner never enters a key. */
+export function connectionsFromEnv(): SumupConnection[] {
+  const perStore = [
+    envConnection("fittja", process.env.SUMUP_FITTJA_API_KEY, process.env.SUMUP_FITTJA_MERCHANT_CODE),
+    envConnection("marsta", process.env.SUMUP_MARSTA_API_KEY, process.env.SUMUP_MARSTA_MERCHANT_CODE),
+  ].filter((item): item is SumupConnection => Boolean(item));
+  if (perStore.length > 0) return perStore;
+  const singleStore: StoreId = process.env.SUMUP_STORE_ID === "marsta" ? "marsta" : "fittja";
+  const single = envConnection(singleStore, process.env.SUMUP_API_KEY, process.env.SUMUP_MERCHANT_CODE);
+  return single ? [single] : [];
+}
+
 export async function listConnections(): Promise<SumupConnection[]> {
-  const remote = await firebaseSecrets();
-  const stored = remote ? ((await remote.get()) ?? { connections: [] }) : await readFileSecrets();
-  const connections = stored.connections.filter((item) => item.apiKey || item.refreshToken || item.accessToken);
-  const envKey = process.env.SUMUP_API_KEY?.trim();
-  if (envKey && !connections.some((item) => item.fromEnv || item.apiKey === envKey)) {
-    connections.unshift({
-      id: "env",
-      authType: "api_key",
-      apiKey: envKey,
-      merchantCode: process.env.SUMUP_MERCHANT_CODE?.trim() || "",
-      merchantName: "Miljövariabel",
-      extraMerchantCodes: [],
-      keyHint: hint(envKey),
-      fromEnv: true,
-    });
-  }
-  return connections;
+  return connectionsFromEnv();
 }
 
 export async function saveConnection(connection: SumupConnection): Promise<void> {

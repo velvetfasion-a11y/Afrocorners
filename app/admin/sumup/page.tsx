@@ -1,7 +1,10 @@
 "use client";
 
-import { SumupPage } from "@/components/admin/screens";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 export default function Page() {
-  return <SumupPage />;
+  const router = useRouter();
+  useEffect(() => { router.replace("/admin"); }, [router]);
+  return <p className="text-muted">Kassan sätts upp av den som bygger sidan.</p>;
 }
