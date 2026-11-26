@@ -6,7 +6,7 @@ import { InlineNote, Loading, moveItem, useCatalog, useWarnIfDirty } from "@/com
 import { useAdminDirty } from "@/components/admin/shell";
 import { api } from "@/components/admin/api";
 import { Input, Label, Textarea } from "@/components/ui/input";
-import type { CampaignCard, HeroSlide, SiteContent } from "@/lib/types";
+import { homepageTiles, type CampaignCard, type HeroSlide, type SiteContent } from "@/lib/types";
 
 type Section = "info" | "hero" | "categories" | "campaign" | "features" | "footer";
 
@@ -87,7 +87,7 @@ function Preview({ content, active, onPick }: { content: SiteContent; active: Se
         </span>
       </button>
       <div className="grid grid-cols-3 gap-2 p-3">
-        {content.categories.slice(0, 6).map((tile) => (
+        {homepageTiles(content.categories).map((tile) => (
           <button key={tile.id} type="button" className={box(active === "categories")} onClick={() => onPick("categories")}>
             <img src={tile.image} alt="" className="aspect-square w-full rounded-xl object-cover" />
             <span className="mt-1 block text-xs">{tile.name}</span>

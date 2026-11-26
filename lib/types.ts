@@ -143,6 +143,16 @@ export interface CategoryTile {
   href: string;
 }
 
+/** Homepage grid only. Other tiles stay in the menu and footer. */
+export const HOMEPAGE_TILE_IDS = ["harvard", "mat", "nyheter"] as const;
+
+export function homepageTiles(categories: CategoryTile[]): CategoryTile[] {
+  return HOMEPAGE_TILE_IDS.flatMap((id) => {
+    const tile = categories.find((item) => item.id === id);
+    return tile ? [tile] : [];
+  });
+}
+
 export interface CampaignCard {
   id: string;
   title: string;

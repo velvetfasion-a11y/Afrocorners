@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { dateInStockholm, storeStatus } from "../lib/hours";
+import { dateInStockholm, storeStatus, weeklyHoursSummary } from "../lib/hours";
 import { applyOrderStock, commitMovement, reverseOrderStock, type InventoryPort } from "../lib/inventory";
 import { buildOrderMessage, smsUrl, whatsappUrl } from "../lib/orders";
 import { toE164 } from "../lib/format";
 import { seedContent, seedProducts } from "../lib/seed";
 import { parseSale, parseTransaction, saleIdFromClientTransaction } from "../lib/sumup/parse";
 import { planSumupSync } from "../lib/sumup/plan";
-import type { Order, Product, StockLogEntry, StockMovementInput } from "../lib/types";
+import { homepageTiles, type Order, type Product, type StockLogEntry, type StockMovementInput } from "../lib/types";
 
 function memory(products: Product[]) {
   const logs: StockLogEntry[] = [];
@@ -63,6 +63,42 @@ describe("öppettider", () => {
   it("hoppar över en extra ledig dag", () => {
     const closed = { ...fittja, closedDates: ["2026-11-26"] };
     expect(storeStatus(closed, dateInStockholm(2026, 11, 25, 21, 0)).label).toBe("Öppnar fredag kl 10:00");
+  });
+
+  it("sammanfattar veckan som Mån–Fre, Lör och Sön", () => {
+    expect(weeklyHoursSummary(fittja.hours)).toEqual([
+      { label: "Mån–Fre", hours: "10:00–20:00" },
+      { label: "Lör", hours: "10:00–17:00" },
+      { label: "Sön", hours: "11:00–16:00" },
+    ]);
+    expect(weeklyHoursSummary(marsta.hours)).toEqual([
+      { label: "Mån–Fre", hours: "10:00–18:30" },
+      { label: "Lör", hours: "10:00–16:00" },
+      { label: "Sön", hours: "Stängt" },
+    ]);
+  });
+
+  it("slår inte ihop dagar med olika tider", () => {
+    const hours = {
+      ...fittja.hours,
+      wed: { open: "12:00", close: "16:00" },
+    };
+    expect(weeklyHoursSummary(hours).map((span) => span.label)).toEqual(["Mån–Tis", "Ons", "Tor–Fre", "Lör", "Sön"]);
+  });
+});
+
+describe("startsidans kategorier", () => {
+  it("visar bara hårvård, mat och nyheter, i den ordningen", () => {
+    const tiles = homepageTiles(seedContent.categories);
+    expect(tiles.map((tile) => tile.name)).toEqual(["Hårvård", "Mat & Specerier", "Nyheter"]);
+    expect(seedContent.categories.map((tile) => tile.name)).toEqual([
+      "Hårvård",
+      "Skönhet",
+      "Mat & Specerier",
+      "Kultur & Hem",
+      "Accessoarer",
+      "Nyheter",
+    ]);
   });
 });
 

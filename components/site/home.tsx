@@ -3,6 +3,7 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { homepageTiles } from "@/lib/types";
 import { IconTextRow } from "./shell";
 import { ProductCard } from "./product-card";
 import { useShop } from "./shell";
@@ -84,16 +85,16 @@ export function HomePage() {
       </section>
 
       <section id="kategorier" className="wrap pb-4">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          {content.categories.map((category) => (
-            <Link key={category.id} href={category.href} className="group text-center">
-              <span className="relative block overflow-hidden rounded-[1.3rem] bg-cream-2 shadow-[0_8px_24px_rgba(60,40,20,0.06)]">
+        <div className="grid grid-cols-3 gap-2 sm:gap-4 lg:gap-6">
+          {homepageTiles(content.categories).map((category) => (
+            <Link key={category.id} href={category.href} className="group min-w-0 text-center">
+              <span className="relative block overflow-hidden rounded-[1.1rem] bg-cream-2 shadow-[0_8px_24px_rgba(60,40,20,0.06)] sm:rounded-[1.3rem]">
                 <img src={category.image} alt="" className="aspect-square w-full object-cover transition duration-300 group-hover:scale-[1.03]" />
                 {category.id === "nyheter" && (
-                  <span className="absolute right-2 top-3 rotate-6 rounded-sm bg-[#f3d392] px-2 py-1 text-[10px] font-semibold tracking-wide text-bark">NYHETER</span>
+                  <span className="absolute right-1.5 top-2 rotate-6 rounded-sm bg-[#f3d392] px-1.5 py-0.5 text-[9px] font-semibold tracking-wide text-bark sm:right-2 sm:top-3 sm:px-2 sm:py-1 sm:text-[10px]">NYHETER</span>
                 )}
               </span>
-              <span className="mt-2 block text-sm font-medium text-ink">{category.name} ›</span>
+              <span className="mt-2 block text-balance text-[11px] font-medium leading-snug text-ink sm:text-sm">{category.name} ›</span>
             </Link>
           ))}
         </div>

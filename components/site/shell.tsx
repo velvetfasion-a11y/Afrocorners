@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { AfricaMark } from "@/components/AfricaMark";
 import type { IconName, Product, SiteContent } from "@/lib/types";
-import { StoreLines } from "./store-bits";
+import { StoreCard, useNow } from "./store-bits";
 
 type Cart = Record<string, number>;
 
@@ -139,6 +139,7 @@ function Header({ onMenu, onSearch }: { onMenu: () => void; onSearch: () => void
 function NavDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { content } = useShop();
   const router = useRouter();
+  const now = useNow();
   const [query, setQuery] = useState("");
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
@@ -168,9 +169,9 @@ function NavDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
           <Link href="/hitta-oss" onClick={onClose} className="flex items-center justify-between rounded-2xl px-3 py-3 hover:bg-cream">Hitta oss <ChevronRight className="h-4 w-4 text-muted" /></Link>
           <Link href="/varukorg" onClick={onClose} className="flex items-center justify-between rounded-2xl px-3 py-3 hover:bg-cream">Varukorg <ChevronRight className="h-4 w-4 text-muted" /></Link>
         </nav>
-        <div className="space-y-3 border-t border-line px-4 py-4">
+        <div className="max-h-[46%] space-y-3 overflow-y-auto border-t border-line px-4 py-4">
           {content.stores.map((store) => (
-            <StoreLines key={store.id} store={store} compact />
+            <StoreCard key={store.id} store={store} now={now} dense />
           ))}
         </div>
       </div>
@@ -180,37 +181,40 @@ function NavDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
 
 function Footer() {
   const { content } = useShop();
+  const now = useNow();
   return (
     <footer className="mt-16 border-t border-line bg-paper">
       <div className="wrap py-8">
         <IconTextRow items={content.footerHighlights} />
       </div>
       <div className="border-t border-line">
-        <div className="wrap grid gap-8 py-10 md:grid-cols-4">
-          <div className="md:col-span-1">
-            <p className="font-display text-3xl">Afro<span className="italic text-gold">Corner</span></p>
-            <p className="mt-3 text-sm leading-6 text-muted">{content.footerAbout}</p>
-            <p className="mt-3 text-sm">Fri frakt över {content.freeShippingThreshold} kr vid hemleverans.</p>
-          </div>
-          <div>
-            <p className="font-medium">Handla</p>
-            <ul className="mt-3 space-y-2 text-sm">
-              {content.categories.map((category) => (
-                <li key={category.id}><Link href={category.href} className="hover:underline">{category.name}</Link></li>
-              ))}
-              <li><Link href="/erbjudanden" className="hover:underline">Erbjudanden</Link></li>
-            </ul>
-          </div>
-          <div className="space-y-4">
+        <div className="wrap py-10">
+          <div className="grid gap-3 md:grid-cols-2 md:gap-4">
             {content.stores.map((store) => (
-              <StoreLines key={store.id} store={store} compact />
+              <StoreCard key={store.id} store={store} now={now} />
             ))}
           </div>
-          <div className="text-sm">
-            <p className="font-medium">Kundtjänst</p>
-            <p className="mt-3"><a className="hover:underline" href={`tel:${content.ownerPhone}`}>{content.ownerPhone}</a></p>
-            <p className="mt-1"><a className="hover:underline" href={`mailto:${content.footerEmail}`}>{content.footerEmail}</a></p>
-            <p className="mt-4"><Link href="/hitta-oss" className="hover:underline">Hitta oss</Link></p>
+          <div className="mt-8 grid gap-8 md:grid-cols-3">
+            <div>
+              <p className="font-display text-3xl">Afro<span className="italic text-gold">Corner</span></p>
+              <p className="mt-3 text-sm leading-6 text-muted">{content.footerAbout}</p>
+              <p className="mt-3 text-sm">Fri frakt över {content.freeShippingThreshold} kr vid hemleverans.</p>
+            </div>
+            <div>
+              <p className="font-medium">Handla</p>
+              <ul className="mt-3 space-y-2 text-sm">
+                {content.categories.map((category) => (
+                  <li key={category.id}><Link href={category.href} className="hover:underline">{category.name}</Link></li>
+                ))}
+                <li><Link href="/erbjudanden" className="hover:underline">Erbjudanden</Link></li>
+              </ul>
+            </div>
+            <div className="text-sm">
+              <p className="font-medium">Kundtjänst</p>
+              <p className="mt-3"><a className="hover:underline" href={`tel:${content.ownerPhone}`}>{content.ownerPhone}</a></p>
+              <p className="mt-1"><a className="hover:underline" href={`mailto:${content.footerEmail}`}>{content.footerEmail}</a></p>
+              <p className="mt-4"><Link href="/hitta-oss" className="hover:underline">Hitta oss</Link></p>
+            </div>
           </div>
         </div>
         <p className="wrap pb-8 text-xs text-muted">© {new Date().getFullYear()} AfroCorner</p>

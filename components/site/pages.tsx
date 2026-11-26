@@ -6,9 +6,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { badgeFor, normalizeName, sek, toE164, unitPrice } from "@/lib/format";
 import { buildOrderMessage, smsUrl, whatsappUrl } from "@/lib/orders";
-import { WEEKDAYS, WEEKDAY_LABELS, type Order, type Product, type StoreId } from "@/lib/types";
+import type { Order, Product, StoreId } from "@/lib/types";
 import { ProductGrid } from "./product-card";
-import { StoreLines } from "./store-bits";
+import { StoreCard, StoreLines, useNow } from "./store-bits";
 import { useShop } from "./shell";
 
 export function CategoryPage({ slug }: { slug: string }) {
@@ -356,22 +356,13 @@ async function imageFiles(order: Order): Promise<File[]> {
 
 export function StoresPage() {
   const { content } = useShop();
+  const now = useNow();
   return (
     <div className="wrap py-8">
       <h1 className="font-display text-4xl">Hitta oss</h1>
       <div className="mt-6 grid gap-4 md:grid-cols-2">
         {content.stores.map((store) => (
-          <article key={store.id} className="rounded-3xl bg-paper p-5">
-            <StoreLines store={store} />
-            <ul className="mt-4 space-y-1 text-sm">
-              {WEEKDAYS.map((day) => (
-                <li key={day} className="flex justify-between gap-4">
-                  <span>{WEEKDAY_LABELS[day]}</span>
-                  <span>{store.hours[day] ? `${store.hours[day]?.open}–${store.hours[day]?.close}` : "Ingen öppettid"}</span>
-                </li>
-              ))}
-            </ul>
-          </article>
+          <StoreCard key={store.id} store={store} now={now} />
         ))}
       </div>
     </div>

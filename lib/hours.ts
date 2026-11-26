@@ -1,4 +1,42 @@
-import { WEEKDAYS, WEEKDAY_LABELS, type StoreLocation, type Weekday } from "./types";
+import { WEEKDAYS, WEEKDAY_LABELS, type DayHours, type StoreLocation, type Weekday } from "./types";
+
+const SHORT_WEEKDAY: Record<Weekday, string> = {
+  mon: "Mån",
+  tue: "Tis",
+  wed: "Ons",
+  thu: "Tor",
+  fri: "Fre",
+  sat: "Lör",
+  sun: "Sön",
+};
+
+export interface HoursSpan {
+  label: string;
+  hours: string;
+}
+
+function hoursText(day: DayHours | null): string {
+  return day ? `${day.open}–${day.close}` : "Stängt";
+}
+
+/** Consecutive days with the same hours, e.g. Mån–Fre, Lör, Sön. */
+export function weeklyHoursSummary(hours: StoreLocation["hours"]): HoursSpan[] {
+  const spans: HoursSpan[] = [];
+  let index = 0;
+  while (index < WEEKDAYS.length) {
+    const text = hoursText(hours[WEEKDAYS[index]]);
+    let end = index;
+    while (end + 1 < WEEKDAYS.length && hoursText(hours[WEEKDAYS[end + 1]]) === text) end += 1;
+    const startLabel = SHORT_WEEKDAY[WEEKDAYS[index]];
+    const endLabel = SHORT_WEEKDAY[WEEKDAYS[end]];
+    spans.push({
+      label: index === end ? startLabel : `${startLabel}–${endLabel}`,
+      hours: text,
+    });
+    index = end + 1;
+  }
+  return spans;
+}
 
 export interface StockholmClock {
   year: number;
