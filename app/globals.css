@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-playfair), Georgia, "Times New Roman", serif;
+  --color-cream: #f3eee6;
+  --color-cream-2: #e8dfd0;
+  --color-paper: #fbf8f3;
+  --color-ink: #1b140f;
+  --color-brown: #3c291c;
+  --color-muted: #6d5646;
+  --color-gold: #c6a15a;
+  --color-gold-deep: #8c6a2f;
+  --color-bark: #2a1c12;
+  --color-line: #e5d9c8;
+  --color-good: #2f6b45;
+}
+
+:root {
+  --header-h: 108px;
+  color-scheme: light;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--color-cream);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+button, input, select, textarea {
+  font: inherit;
+}
+
+::selection {
+  background: #ead7ae;
+}
+
+.wrap {
+  width: min(1120px, calc(100% - 1.5rem));
+  margin-inline: auto;
+}
+
+@media (min-width: 768px) {
+  .wrap {
+    width: min(1120px, calc(100% - 3rem));
+  }
+}
+
+.gold-btn {
+  background-image: linear-gradient(180deg, #f3d392 0%, #e0b45a 42%, #c9963c 100%);
+  color: #2a1c12;
+  box-shadow: 0 8px 18px rgba(120, 78, 20, 0.16);
+}
+
+.gold-btn:hover {
+  filter: brightness(1.03);
+}
+
+.field {
+  width: 100%;
+  border-radius: 0.9rem;
+  border: 1px solid var(--color-line);
+  background: white;
+  padding: 0.75rem 0.9rem;
+  color: var(--color-ink);
+  outline: none;
+}
+
+.field:focus {
+  border-color: var(--color-gold);
+  box-shadow: 0 0 0 3px rgba(198, 161, 90, 0.28);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
