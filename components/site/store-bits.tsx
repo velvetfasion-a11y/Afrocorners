@@ -35,7 +35,7 @@ export function StoreCard({ store, now, dense = false }: { store: StoreLocation;
   const week = weeklyHoursSummary(store.hours);
   const today = status.todayHours === "Ingen öppettid" ? "stängt" : status.todayHours;
   return (
-    <article className={`rounded-2xl border border-[#e4d3b4] bg-[#fbf6ee] text-left shadow-[0_1px_0_rgba(42,28,18,0.04)] ${dense ? "p-3" : "p-4 sm:p-5"}`}>
+    <article className={`rounded-2xl border border-[#e4d3b4] bg-[#FFFFFF] text-left shadow-[0_1px_0_rgba(42,28,18,0.04)] ${dense ? "p-3" : "p-4 sm:p-5"}`}>
       <h3 className="font-display text-xl leading-none text-bark">{store.name.replace("AfroCorner ", "")}</h3>
       <p className="mt-1.5 text-sm text-muted">{store.address}, {store.postalCity}</p>
       <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1">
