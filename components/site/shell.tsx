@@ -68,13 +68,13 @@ function InfoBar({ items }: { items: SiteContent["infoBar"] }) {
     return () => window.clearInterval(id);
   }, [items.length]);
   return (
-    <div className="h-9 overflow-hidden border-b border-line bg-paper text-[13px] text-brown">
+    <div className="h-9 overflow-hidden border-b border-white/10 bg-bark text-[13px] text-[#f6efe4]">
       <div className="mx-auto hidden h-full max-w-6xl items-center justify-center gap-10 md:flex">
         {items.map((item) => {
           const Icon = ICONS[item.icon] ?? Truck;
           return (
             <span key={item.id} className="inline-flex items-center gap-2">
-              <Icon className="h-3.5 w-3.5" /> {item.text}
+              <Icon className="h-3.5 w-3.5 text-[#f6efe4]" /> {item.text}
             </span>
           );
         })}
@@ -84,7 +84,7 @@ function InfoBar({ items }: { items: SiteContent["infoBar"] }) {
           const Icon = ICONS[item.icon] ?? Truck;
           return (
             <p key={item.id} className={`absolute inset-0 flex items-center justify-center gap-2 px-4 transition-opacity duration-300 ${itemIndex === index ? "opacity-100" : "pointer-events-none opacity-0"}`}>
-              <Icon className="h-3.5 w-3.5 shrink-0" />
+              <Icon className="h-3.5 w-3.5 shrink-0 text-[#f6efe4]" />
               <span className="truncate">{item.text}</span>
             </p>
           );
@@ -97,38 +97,38 @@ function InfoBar({ items }: { items: SiteContent["infoBar"] }) {
 function Header({ onMenu, onSearch }: { onMenu: () => void; onSearch: () => void }) {
   const { content, count } = useShop();
   return (
-    <header className="bg-paper/95 backdrop-blur-md">
+    <header className="bg-bark text-[#f6efe4]">
       <InfoBar items={content.infoBar} />
-      <div className="wrap grid h-[4.6rem] grid-cols-[auto_1fr_auto] items-center gap-2 md:h-[4.75rem]">
-        <div className="flex items-center gap-1">
-          <button type="button" className="grid h-11 w-11 place-items-center rounded-full hover:bg-cream" aria-label="Meny" onClick={onMenu}>
+      <div className="wrap grid h-[4.6rem] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1 md:h-[4.75rem]">
+        <div className="flex items-center">
+          <button type="button" className="grid h-10 w-10 place-items-center rounded-full text-[#f6efe4] hover:bg-white/10 md:h-11 md:w-11" aria-label="Meny" onClick={onMenu}>
             <Menu className="h-5 w-5" />
           </button>
-          <button type="button" className="grid h-11 w-11 place-items-center rounded-full hover:bg-cream" aria-label="Sök" onClick={onSearch}>
+          <button type="button" className="grid h-10 w-10 place-items-center rounded-full text-[#f6efe4] hover:bg-white/10 md:h-11 md:w-11" aria-label="Sök" onClick={onSearch}>
             <Search className="h-5 w-5" />
           </button>
         </div>
-        <Link href="/" className="justify-self-center text-center">
+        <Link href="/" className="min-w-0 justify-self-center text-center">
           <span className="flex items-center justify-center gap-1.5">
-            <span className="font-display text-[1.55rem] leading-none tracking-tight text-ink md:text-[1.85rem]">
+            <span className="truncate font-display text-[1.35rem] leading-none tracking-tight text-[#f7f1e6] sm:text-[1.55rem] md:text-[1.85rem]">
               Afro<span className="italic text-gold">Corner</span>
             </span>
-            <AfricaMark className="h-6 w-6 text-gold md:h-7 md:w-7" />
+            <AfricaMark className="h-6 w-5 shrink-0 text-gold md:h-7 md:w-6" />
           </span>
-          <span className="mt-1 block text-[8px] font-medium uppercase tracking-[0.14em] text-muted sm:text-[10px] sm:tracking-[0.18em]">
+          <span className="mt-1 block truncate text-[8px] font-medium uppercase tracking-[0.12em] text-gold sm:text-[10px] sm:tracking-[0.18em]">
             Afrikanska varor • Hårvård • Mat • Skönhet
           </span>
         </Link>
-        <div className="flex items-center">
-          <Link href="/konto" className="grid h-11 w-11 place-items-center rounded-full hover:bg-cream" aria-label="Konto">
+        <div className="flex items-center pr-1 text-[#f6efe4]">
+          <Link href="/konto" className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10 md:h-11 md:w-11" aria-label="Konto">
             <User className="h-5 w-5" />
           </Link>
-          <Link href="/favoriter" className="grid h-11 w-11 place-items-center rounded-full hover:bg-cream" aria-label="Favoriter">
+          <Link href="/favoriter" className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10 md:h-11 md:w-11" aria-label="Favoriter">
             <Heart className="h-5 w-5" />
           </Link>
-          <Link href="/varukorg" className="relative grid h-11 w-11 place-items-center rounded-full hover:bg-cream" aria-label={`Varukorg, ${count} varor`}>
+          <Link href="/varukorg" className="relative grid h-10 w-10 place-items-center rounded-full hover:bg-white/10 md:h-11 md:w-11" aria-label={`Varukorg, ${count} varor`}>
             <ShoppingBag className="h-5 w-5" />
-            <span className="absolute right-1 top-1 grid h-4 min-w-4 place-items-center rounded-full bg-gold px-1 text-[10px] font-semibold text-bark">{count}</span>
+            <span className="absolute right-0 top-0 z-10 grid h-[1.15rem] min-w-[1.15rem] -translate-y-0.5 translate-x-0 place-items-center rounded-full bg-gold px-1 text-[10px] font-semibold leading-none text-bark">{count}</span>
           </Link>
         </div>
       </div>
@@ -303,7 +303,7 @@ export function ShopShell({
 
   return (
     <ShopContext.Provider value={value}>
-      <div data-site-header className="fixed inset-x-0 top-0 z-50">
+      <div data-site-header className="fixed inset-x-0 top-0 z-50 bg-bark">
         <Header onMenu={() => setMenu(true)} onSearch={() => setSearchOpen(true)} />
       </div>
       <div aria-hidden style={{ height: "var(--header-h)" }} />

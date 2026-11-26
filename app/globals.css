@@ -32,6 +32,10 @@ body {
   font-family: var(--font-sans);
 }
 
+nextjs-portal {
+  display: none !important;
+}
+
 button, input, select, textarea {
   font: inherit;
 }
