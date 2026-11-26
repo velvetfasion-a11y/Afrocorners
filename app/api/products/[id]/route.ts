@@ -1,7 +1,7 @@
 import { deleteProduct, readDatabase, saveProduct } from "@/lib/server/db";
 import { isUser, json, requireAdmin } from "@/lib/server/guard";
 import type { Product } from "@/lib/types";
-import { sanitizeProduct } from "../route";
+import { sanitizeProduct } from "@/lib/server/sanitize-product";
 
 export async function PUT(req: Request, context: { params: Promise<{ id: string }> }) {
   const admin = await requireAdmin(req);

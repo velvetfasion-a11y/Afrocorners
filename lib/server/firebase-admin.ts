@@ -28,3 +28,8 @@ export function firebaseAdminApp(): App | null {
 export function usingFirebase(): boolean {
   return firebaseAdminConfigured() && Boolean(process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID);
 }
+
+/** The open local preview login. Never available in production unless explicitly forced. */
+export function demoAdminAllowed(): boolean {
+  return process.env.NODE_ENV !== "production" || process.env.ALLOW_DEMO_ADMIN === "1";
+}

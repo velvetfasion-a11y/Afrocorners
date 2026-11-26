@@ -2,6 +2,7 @@ import "server-only";
 
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 import { mkdir, readFile, writeFile } from "fs/promises";
+import { tmpdir } from "os";
 import path from "path";
 
 export interface SessionUser {
@@ -16,7 +17,7 @@ export interface SessionUser {
 const COOKIE = "afro_session";
 
 function secretFile() {
-  return path.join(process.cwd(), ".data", "session-secret");
+  return path.join(process.env.VERCEL ? path.join(tmpdir(), "afrocorner") : path.join(process.cwd(), ".data"), "session-secret");
 }
 
 let cachedSecret: string | null = null;

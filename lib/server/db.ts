@@ -1,6 +1,7 @@
 import "server-only";
 
 import { mkdir, readFile, writeFile } from "fs/promises";
+import { tmpdir } from "os";
 import path from "path";
 import { unitPrice } from "../format";
 import { applyOrderStock, commitMovement, reverseOrderStock, type CommitResult } from "../inventory";
@@ -8,7 +9,7 @@ import { createSeed } from "../seed";
 import type { Database, Order, Product, SiteContent, StockLogEntry, StockMovementInput, StoreId, SumupState } from "../types";
 import { firebaseAdminApp, usingFirebase } from "./firebase-admin";
 
-const FILE = path.join(process.cwd(), ".data", "db.json");
+const FILE = path.join(process.env.VERCEL ? path.join(tmpdir(), "afrocorner") : path.join(process.cwd(), ".data"), "db.json");
 
 let chain: Promise<unknown> = Promise.resolve();
 

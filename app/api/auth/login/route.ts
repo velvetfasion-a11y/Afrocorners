@@ -8,7 +8,7 @@ import {
 } from "@/lib/server/access-code";
 import { allowGoogleAdmin, mirrorAdminDoc } from "@/lib/server/google-admin";
 import { json } from "@/lib/server/guard";
-import { firebaseAdminApp, usingFirebase } from "@/lib/server/firebase-admin";
+import { demoAdminAllowed, firebaseAdminApp, usingFirebase } from "@/lib/server/firebase-admin";
 import { loginAllowed, sessionClearCookie, sessionSetCookie, signSession } from "@/lib/server/session";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +23,7 @@ export async function POST(req: Request) {
   const body = (await req.json().catch(() => ({}))) as { idToken?: string; code?: string; demo?: boolean };
 
   if (!usingFirebase()) {
+    if (!demoAdminAllowed()) return json({ error: "Inloggningen är inte färdigkonfigurerad." }, 503);
     if (body.demo !== true) return json({ error: "Den här förhandsvisningen har ingen Google-inloggning." }, 400);
     const codeOk = await codeIsAccepted(body.code, "demo-local", ip);
     if (codeOk) return codeOk;

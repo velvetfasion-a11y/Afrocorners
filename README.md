@@ -15,8 +15,9 @@ npm run dev
 
 Demoläge (Firebase är inte ifyllt):
 
-- Butiken sparas i `.data/db.json` på servern.
+- Butiken sparas i `.data/db.json` på servern. På Vercel, utan Firebase, skrivs samma fil till `/tmp/afrocorner` och försvinner när instansen startar om.
 - `/admin` visar en tydlig lokal förhandsvisning och en knapp, utan lösenord och utan Google.
+- I produktion är den knappen avstängd. Sätt `ALLOW_DEMO_ADMIN=1` bara om en medveten förhandsvisning ska ha den.
 - Så fort Firebase är påslaget gäller bara Google plus åtkomstkod. Demoknappen fungerar inte då.
 
 ```bash
@@ -99,7 +100,7 @@ Så här kopplar vi (inte ägaren):
 1. I [me.sumup.com](https://me.sumup.com): **Settings → For developers → Toolkit → API keys**. Skapa en hemlig nyckel per butik. SumUp visar den bara en gång.
 2. Sätt `SUMUP_FITTJA_API_KEY` och `SUMUP_FITTJA_MERCHANT_CODE`, och samma par för Märsta. Nycklarna läses bara på servern.
 3. Lägg samma SKU på varan i AfroCorner och i SumUps katalog. Namn matchas också. Omatchade rader syns på `/admin/dev` för kontot med rollen developer, inte i ägarens admin.
-4. Sätt `CRON_SECRET`. Vercel anropar `GET /api/sumup/sync` var tionde minut.
+4. Sätt `CRON_SECRET`. Vercel anropar `GET /api/sumup/sync` en gång per dygn, kl. 03:00 UTC (`0 3 * * *`). Hobby-planen tillåter bara dagliga cron-jobb.
 
 Det här kan SumUp-API:t inte göra, och därför gör sidan det inte heller:
 
@@ -112,7 +113,7 @@ Loggrader från SumUp har orsaken **SumUp-försäljning** eller **SumUp-retur**.
 
 ## Publicera
 
-Vercel: importera repot, lägg in samma miljövariabler, sätt `CRON_SECRET`. `vercel.json` pollar SumUp var tionde minut.
+Vercel: importera repot, lägg in samma miljövariabler, sätt `CRON_SECRET`. `vercel.json` pollar SumUp en gång per dygn (`0 3 * * *`, 03:00 UTC). Hobby-planen tillåter inte ett jobb var tionde minut.
 
 Firebase Hosting kör inte den här Next-servern av sig själv. API, admin och SumUp-synk behöver en Node-server (Vercel eller motsvarande). Firestore och Storage används som databas när service account är satt.
 

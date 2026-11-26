@@ -1,15 +1,15 @@
 import { accessCodeConfigured } from "@/lib/server/access-code";
 import { json } from "@/lib/server/guard";
-import { usingFirebase } from "@/lib/server/firebase-admin";
+import { demoAdminAllowed, usingFirebase } from "@/lib/server/firebase-admin";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   const firebase = usingFirebase();
   return json({
-    mode: firebase ? "google" : "demo",
+    mode: firebase || !demoAdminAllowed() ? "google" : "demo",
     codeRequired: accessCodeConfigured(),
-    ready: firebase ? accessCodeConfigured() : true,
+    ready: firebase ? accessCodeConfigured() : demoAdminAllowed(),
     firebase: firebase
       ? {
           apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
